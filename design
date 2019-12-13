@@ -1,0 +1,58 @@
+State
+=====
+
+State {
+    hidden       : Bool
+    mainBindings : Bindings
+    controllers  : [Controller]
+    routes       : {Key => [(Usize, Action)]}
+    mirrors      : [BitSet Usize; size controllers]
+}
+
+Controller {
+    windowId : Maybe Int
+    mirror   : Maybe Usize
+    bindings : Bindings
+}
+
+Bindings {
+    forward  : Key
+    back     : Key
+    left     : Key
+    right    : Key
+    jump     : Key
+    dismount : Key
+    throw    : Key
+    lowThrow : Key
+    talk     : Key
+}
+
+Action = Simple   Key
+       | LowThrow Key
+       | Talk     Key
+
+GUI
+===
+
+Unexpanded:
+
++--------------+
+| [⋮]      [x] |
++--------------+
+
+Expanded:
+
++-----------------------------------------------------------------------------------------------+
+| [⋮]                                                                                       [x] |
++-----------------------------------------------------------------------------------------------+
+|              | forward | back  | left  | right | jump  | dismount | throw | low throw | talk  |
+|              +---------+-------+-------+-------+-------+----------+-------+-----------+------ |
+|     | mirror |  [KEY]  | [KEY] | [KEY] | [KEY] | [KEY] |  [KEY]   | [KEY] |                   |
+| ----+--------+---------+-------+-------+-------+-------+----------+-------+-----------+------ |
+| [+] |  [n]   |  [KEY]  | [KEY] | [KEY] | [KEY] | [KEY] |  [KEY]   | [KEY] |   [KEY]   | [KEY] |
+| [+] |  [n]   |  [KEY]  | [KEY] | [KEY] | [KEY] | [KEY] |  [KEY]   | [KEY] |   [KEY]   | [KEY] |
+| [+] |  [n]   |  [KEY]  | [KEY] | [KEY] | [KEY] | [KEY] |  [KEY]   | [KEY] |   [KEY]   | [KEY] |
+| [+] |  [n]   |  [KEY]  | [KEY] | [KEY] | [KEY] | [KEY] |  [KEY]   | [KEY] |   [KEY]   | [KEY] |
+| [+] |  [n]   |  [KEY]  | [KEY] | [KEY] | [KEY] | [KEY] |  [KEY]   | [KEY] |   [KEY]   | [KEY] |
+| [+] |  [n]   |  [KEY]  | [KEY] | [KEY] | [KEY] | [KEY] |  [KEY]   | [KEY] |   [KEY]   | [KEY] |
++-----------------------------------------------------------------------------------------------+

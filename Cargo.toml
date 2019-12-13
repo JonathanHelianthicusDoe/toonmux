@@ -1,0 +1,29 @@
+[package]
+name = "toonmux"
+version = "0.0.0"
+authors = ["JonathanHelianthicusDoe <augiii@protonmail.com>"]
+edition = "2018"
+description = "Toon multiplexer for playing Toontown on X11"
+repository = "https://github.com/JonathanHelianthicusDoe/toonmux"
+readme = "README.md"
+keywords = ["toontown", "ttr", "x11", "controller", "multiplexer"]
+categories = ["games"]
+license = "GPL-3.0-or-later"
+
+[dependencies]
+gdk = { version = "0.11.0", features = ["v3_22", "embed-lgpl-docs"] }
+glib = "0.8.2"
+gtk = { version = "0.7.0", features = ["v3_22", "embed-lgpl-docs"] }
+libxdo-sys = "0.11.0"
+x11 = "2.18.1"
+
+[profile.release]
+opt-level = 3
+debug = false
+rpath = false
+lto = "fat"
+debug-assertions = false
+codegen-units = 1
+panic = "abort"
+incremental = false
+overflow-checks = false
