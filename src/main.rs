@@ -48,6 +48,7 @@ fn main() {
 
     // Hook up controller binding buttons.
     for (i, ctl_ui) in toonmux.interface.controller_uis.iter().enumerate() {
+        // Hook up the "+" button.
         {
             let state = Arc::clone(&state);
             ctl_ui.pick_window.connect_clicked(move |_| {
@@ -126,6 +127,7 @@ fn main() {
             }};
         }
 
+        // Hook up keybinding buttons.
         connect_key_binder!(forward, "forward");
         connect_key_binder!(back, "back");
         connect_key_binder!(left, "left");
