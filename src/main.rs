@@ -112,10 +112,9 @@ fn main() {
         let state = Arc::clone(&state);
         let toonmux_ref = Arc::clone(&toonmux);
         toonmux.header.expand.connect_clicked(move |_| {
-            let hidden = !state.hidden.load(Ordering::SeqCst);
-            state.hidden.store(hidden, Ordering::SeqCst);
+            let prev_hidden = state.hidden.fetch_nand(true, Ordering::SeqCst);
 
-            if hidden {
+            if !prev_hidden {
                 toonmux_ref.interface.container.hide();
                 toonmux_ref.main_window.resize(1, 1);
             } else {
@@ -150,7 +149,7 @@ fn main() {
                         Some(&toonmux_ref.main_window),
                         dialog_flags,
                         &[
-                            ("Clear", ResponseType::DeleteEvent),
+                            ("Clear", ResponseType::Other(0)),
                             ("Cancel", ResponseType::Cancel),
                         ],
                     );
@@ -232,18 +231,13 @@ fn main() {
                         // manipulation here in addition to updating the UI
                         // because this is effectively the "handler" for the
                         // "pressing the Clear button" event.
-                        ResponseType::DeleteEvent => {
+                        ResponseType::Other(0) => {
+                            let new_key = 0;
+                            // Store new (and empty) binding.
                             let old_key = state
                                 .main_bindings
                                 .$key_id
-                                .load(Ordering::SeqCst);
-                            let new_key = 0;
-
-                            // Store new (and empty) binding.
-                            state
-                                .main_bindings
-                                .$key_id
-                                .store(new_key, Ordering::SeqCst);
+                                .swap(new_key, Ordering::SeqCst);
 
                             // Perform rerouting.
                             state.reroute_main(old_key, new_key);
@@ -269,15 +263,59 @@ fn main() {
     // Hook up controller binding buttons.
     for (ctl_ix, ctl_ui) in toonmux.interface.controller_uis.iter().enumerate()
     {
-        // Hook up the "+" button.
+        // Hook up the pick-a-window button.
         {
             let state = Arc::clone(&state);
-            ctl_ui.pick_window.connect_clicked(move |_| {
+            ctl_ui.pick_window.connect_clicked(move |pw| {
                 if let Some(new_window) = state.xdo.select_window_with_click()
                 {
-                    state.controllers[ctl_ix]
-                        .window
-                        .store(new_window, Ordering::SeqCst);
+                    let ctl = &state.controllers[ctl_ix];
+                    let old_window =
+                        ctl.window.swap(new_window, Ordering::SeqCst);
+
+                    if new_window != old_window {
+                        if old_window == 0 {
+                            pw.set_label("\u{2213}"); // 00b1
+                            let pw_style_ctx = pw.get_style_context();
+                            pw_style_ctx.remove_class("suggested-action");
+                            pw_style_ctx.add_class("destructive-action");
+                        } else if new_window == 0 {
+                            pw.set_label("+");
+                            let pw_style_ctx = pw.get_style_context();
+                            pw_style_ctx.remove_class("destructive-action");
+                            pw_style_ctx.add_class("suggested-action");
+                        }
+                    }
+                }
+            });
+        }
+
+        // Hook up mirror menus.
+        for (i, mirror_menu_item) in ctl_ui
+            .mirror
+            .menu
+            .get_children()
+            .into_iter()
+            .map(|c| c.downcast::<gtk::MenuItem>().unwrap())
+            .enumerate()
+        {
+            let state = Arc::clone(&state);
+            mirror_menu_item.connect_activate(move |mmi| {
+                let ctl = &state.controllers[ctl_ix];
+                let new_mirror = i.wrapping_sub(1);
+
+                // Store the new `mirror` value.
+                let old_mirror = ctl.mirror.swap(new_mirror, Ordering::SeqCst);
+
+                // Get rid of the `mirrored` entry for this controller, if any.
+                if old_mirror != ::std::usize::MAX {
+                    state.controllers[old_mirror].mirrored.remove(ctl_ix);
+                }
+
+                // If we do set a mirror (i.e. not "none"), then update the
+                // mirror's `mirrored` set to contain this controller.
+                if i != 0 {
+                    state.controllers[new_mirror].mirrored.insert(ctl_ix);
                 }
             });
         }
@@ -296,7 +334,7 @@ fn main() {
                         Some(&toonmux.main_window),
                         dialog_flags,
                         &[
-                            ("Clear", ResponseType::DeleteEvent),
+                            ("Clear", ResponseType::Other(0)),
                             ("Cancel", ResponseType::Cancel),
                         ],
                     );
@@ -315,11 +353,12 @@ fn main() {
                         let state = Arc::clone(&state);
                         key_choose_dialog.connect_key_press_event(
                             move |kcd, e| {
+                                let new_key = canonicalize_key(e.get_keyval());
+                                // Store the new binding.
                                 let old_key = state.controllers[ctl_ix]
                                     .bindings
                                     .$key_id
-                                    .load(Ordering::SeqCst);
-                                let new_key = canonicalize_key(e.get_keyval());
+                                    .swap(new_key, Ordering::SeqCst);
 
                                 // If the user remaps the key to the same key,
                                 // we don't need to do anything.
@@ -328,12 +367,6 @@ fn main() {
 
                                     return Inhibit(false);
                                 }
-
-                                // Store the new binding.
-                                state.controllers[ctl_ix]
-                                    .bindings
-                                    .$key_id
-                                    .store(new_key, Ordering::SeqCst);
 
                                 // Get the main key binding that this key maps
                                 // to (i.e. the one that actually gets sent to
@@ -381,18 +414,13 @@ fn main() {
                         // manipulation here in addition to updating the UI
                         // because this is effectively the "handler" for the
                         // "pressing the Clear button" event.
-                        ResponseType::DeleteEvent => {
+                        ResponseType::Other(0) => {
+                            let new_key = 0;
+                            // Store new (and empty) binding.
                             let old_key = state.controllers[ctl_ix]
                                 .bindings
                                 .$key_id
-                                .load(Ordering::SeqCst);
-                            let new_key = 0;
-
-                            // Store new (and empty) binding.
-                            state.controllers[ctl_ix]
-                                .bindings
-                                .$key_id
-                                .store(new_key, Ordering::SeqCst);
+                                .swap(new_key, Ordering::SeqCst);
 
                             // Get the main key binding that this key maps
                             // to (i.e. the one that actually gets sent to

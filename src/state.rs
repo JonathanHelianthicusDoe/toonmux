@@ -2,11 +2,14 @@ use crate::xdo::Xdo;
 use gdk::enums::key::{self, Key};
 use rustc_hash::FxHashMap;
 use std::sync::{
-    atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering},
+    atomic::{AtomicBool, AtomicU32, AtomicU64, AtomicUsize, Ordering},
     Mutex,
 };
 
 type AtomicKey = AtomicU32;
+
+#[derive(Debug)]
+pub struct AtomicBitSet(AtomicUsize);
 
 #[derive(Debug)]
 pub struct State {
@@ -22,7 +25,9 @@ pub struct Controller {
     /// We use `window = 0` to represent no window being associated with this
     /// controller.
     pub window: AtomicU64,
-    pub mirror: Option<usize>,
+    /// We use `mirror = usize::MAX` to represent no mirroring ("none").
+    pub mirror: AtomicUsize,
+    pub mirrored: AtomicBitSet,
     pub bindings: Bindings,
 }
 
@@ -44,6 +49,20 @@ pub enum Action {
     Simple(Key),
     LowThrow(Key),
     Talk(Key),
+}
+
+impl AtomicBitSet {
+    pub fn new() -> Self {
+        Self(AtomicUsize::new(0))
+    }
+
+    pub fn insert(&self, i: usize) {
+        self.0.fetch_or(1 << i, Ordering::SeqCst);
+    }
+
+    pub fn remove(&self, i: usize) {
+        self.0.fetch_and(!(1 << i), Ordering::SeqCst);
+    }
 }
 
 impl State {
@@ -192,7 +211,8 @@ impl Default for Controller {
     fn default() -> Self {
         Self {
             window: AtomicU64::new(0),
-            mirror: None,
+            mirror: AtomicUsize::new(::std::usize::MAX),
+            mirrored: AtomicBitSet::new(),
             bindings: Default::default(),
         }
     }

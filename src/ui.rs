@@ -48,7 +48,7 @@ pub struct MainBindingsRow {
 
 pub struct ControllerUi {
     pub pick_window: gtk::Button,
-    pub mirror: gtk::MenuButton,
+    pub mirror: Mirror,
     pub forward: gtk::Button,
     pub back: gtk::Button,
     pub left: gtk::Button,
@@ -58,6 +58,11 @@ pub struct ControllerUi {
     pub throw: gtk::Button,
     pub low_throw: gtk::Button,
     pub talk: gtk::Button,
+}
+
+pub struct Mirror {
+    pub button: gtk::MenuButton,
+    pub menu: gtk::Menu,
 }
 
 impl Toonmux {
@@ -115,7 +120,10 @@ impl Interface {
         let controller_uis = state
             .controllers
             .iter()
-            .map(|ctl_state| ControllerUi::new(ctl_state))
+            .enumerate()
+            .map(|(i, ctl_state)| {
+                ControllerUi::new(ctl_state, i, state.controllers.len())
+            })
             .collect();
 
         let interface = Self {
@@ -178,7 +186,7 @@ impl Interface {
             .map(|(i, c)| (i as i32, c))
         {
             self.container.attach(&ctl_ui.pick_window, 0, 2 + i, 1, 1);
-            self.container.attach(&ctl_ui.mirror, 1, 2 + i, 1, 1);
+            self.container.attach(&ctl_ui.mirror.button, 1, 2 + i, 1, 1);
             self.container.attach(&ctl_ui.forward, 2, 2 + i, 1, 1);
             self.container.attach(&ctl_ui.back, 3, 2 + i, 1, 1);
             self.container.attach(&ctl_ui.left, 4, 2 + i, 1, 1);
@@ -245,19 +253,19 @@ impl MainBindingsRow {
 }
 
 impl ControllerUi {
-    fn new(ctl_state: &state::Controller) -> Self {
-        let mirror = gtk::MenuButton::new();
-        mirror.get_child().map(|c| mirror.remove(&c));
-        mirror.add(&gtk::Label::new(Some("\u{22a3}")));
-
+    fn new(
+        ctl_state: &state::Controller,
+        ctl_ix: usize,
+        ctl_count: usize,
+    ) -> Self {
         let pick_window = gtk::Button::new_with_label("+");
         pick_window
             .get_style_context()
             .add_class("suggested-action");
 
         Self {
-            mirror,
             pick_window,
+            mirror: Mirror::new(ctl_ix, ctl_count),
             forward: gtk::Button::new_with_label(
                 key_name(ctl_state.bindings.forward.load(Ordering::SeqCst))
                     .as_str(),
@@ -294,6 +302,52 @@ impl ControllerUi {
                 key_name(ctl_state.bindings.talk.load(Ordering::SeqCst))
                     .as_str(),
             ),
+        }
+    }
+}
+
+impl Mirror {
+    fn new(ctl_ix: usize, ctl_count: usize) -> Self {
+        let button = gtk::MenuButton::new();
+        button.get_child().map(|c| button.remove(&c));
+        button.add(&gtk::Label::new(Some("\u{22a3}")));
+
+        let menu = gtk::Menu::new();
+        menu.attach(&gtk::MenuItem::new_with_label("none"), 0, 1, 0, 1);
+        for (ctl_ix_1, i) in
+            (1..=ctl_count).filter(|&i| i != ctl_ix + 1).zip(1..)
+        {
+            menu.attach(
+                &gtk::MenuItem::new_with_label(&ctl_ix_1.to_string()),
+                0,
+                1,
+                i,
+                i + 1,
+            );
+        }
+        menu.show_all();
+
+        button.set_popup(Some(&menu));
+
+        Self { button, menu }
+    }
+
+    #[inline]
+    pub fn add_menu_item(&self) -> gtk::MenuItem {
+        // FIXME: `.get_children()` allocates.
+        let len = self.menu.get_children().len() as u32;
+
+        let new_item = gtk::MenuItem::new_with_label(&(len + 1).to_string());
+        self.menu.attach(&new_item, 0, 1, len, len + 1);
+        new_item.show_all();
+
+        new_item
+    }
+
+    #[inline]
+    pub fn remove_menu_item(&self) {
+        if let Some(menu_item) = self.menu.get_children().last() {
+            self.menu.remove(menu_item);
         }
     }
 }

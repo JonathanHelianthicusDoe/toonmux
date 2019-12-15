@@ -23,7 +23,8 @@ Multi-toon controller for
 ```bash
 git clone https://github.com/JonathanHelianthicusDoe/toonmux.git
 cd toonmux
-./build.sh  # compiles w/ `target-cpu=native` and strips binary
+cargo rustc --release -- -C target-cpu=native
+strip ./target/release/toonmux
 ./target/release/toonmux
 ```
 
