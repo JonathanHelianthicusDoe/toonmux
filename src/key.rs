@@ -25,10 +25,10 @@ pub fn key_name(key: Key) -> KeyName {
 
     match key {
         0 => Static(""),
-        key::uparrow => Static("\u{2191}"),
-        key::downarrow => Static("\u{2193}"),
-        key::leftarrow => Static("\u{2190}"),
-        key::rightarrow => Static("\u{2192}"),
+        key::Up => Static("\u{2191}"),
+        key::Down => Static("\u{2193}"),
+        key::Left => Static("\u{2190}"),
+        key::Right => Static("\u{2192}"),
         key::BackSpace => Static("\u{232b}"),
         key::Home => Static("\u{1f3e0}"),
         key::Num_Lock => Static("\u{21ed}"),

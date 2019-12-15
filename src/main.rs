@@ -70,7 +70,7 @@ fn main() {
                 }
             }
 
-            Inhibit(false)
+            Inhibit(true)
         });
     }
     {
@@ -103,7 +103,7 @@ fn main() {
                 }
             }
 
-            Inhibit(false)
+            Inhibit(true)
         });
     }
 

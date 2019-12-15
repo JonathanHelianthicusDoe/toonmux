@@ -3,18 +3,12 @@
 use gdk::{self, enums::key::Key};
 use glib::GString;
 use libxdo_sys;
-use std::{ffi::CStr, num::NonZeroI32, os::raw::c_char};
+use std::{num::NonZeroI32, os::raw::c_char};
 use x11::xlib::Window;
 
 #[derive(Debug)]
 pub struct Xdo {
     handle: *mut libxdo_sys::xdo_t,
-}
-
-#[derive(Debug)]
-enum XdoKeyName {
-    Static(&'static CStr),
-    GString(GString),
 }
 
 impl Xdo {
@@ -50,12 +44,12 @@ impl Xdo {
             return Ok(());
         }
 
-        let key_name = Self::key_name(key);
+        let keyval_name = gdk::keyval_name(key).expect("invalid `Key`");
         let res = unsafe {
             libxdo_sys::xdo_send_keysequence_window_down(
                 self.handle,
                 window,
-                key_name.as_ptr(),
+                gstring_as_ptr(&keyval_name),
                 0,
             )
         };
@@ -77,12 +71,12 @@ impl Xdo {
             return Ok(());
         }
 
-        let key_name = Self::key_name(key);
+        let keyval_name = gdk::keyval_name(key).expect("invalid `Key`");
         let res = unsafe {
             libxdo_sys::xdo_send_keysequence_window_up(
                 self.handle,
                 window,
-                key_name.as_ptr(),
+                gstring_as_ptr(&keyval_name),
                 0,
             )
         };
@@ -104,12 +98,12 @@ impl Xdo {
             return Ok(());
         }
 
-        let key_name = Self::key_name(key);
+        let keyval_name = gdk::keyval_name(key).expect("invalid `Key`");
         let res = unsafe {
             libxdo_sys::xdo_send_keysequence_window(
                 self.handle,
                 window,
-                key_name.as_ptr(),
+                gstring_as_ptr(&keyval_name),
                 0,
             )
         };
@@ -118,26 +112,6 @@ impl Xdo {
             Err(code)
         } else {
             Ok(())
-        }
-    }
-
-    fn key_name(key: Key) -> XdoKeyName {
-        use XdoKeyName::*;
-
-        match key {
-            gdk::enums::key::uparrow => {
-                Static(unsafe { CStr::from_bytes_with_nul_unchecked(b"Up\0") })
-            }
-            gdk::enums::key::downarrow => Static(unsafe {
-                CStr::from_bytes_with_nul_unchecked(b"Down\0")
-            }),
-            gdk::enums::key::leftarrow => Static(unsafe {
-                CStr::from_bytes_with_nul_unchecked(b"Left\0")
-            }),
-            gdk::enums::key::rightarrow => Static(unsafe {
-                CStr::from_bytes_with_nul_unchecked(b"Right\0")
-            }),
-            _ => GString(gdk::keyval_name(key).expect("invalid `Key`")),
         }
     }
 }
@@ -150,18 +124,7 @@ impl Drop for Xdo {
     }
 }
 
-impl XdoKeyName {
-    /// Return value has same lifetime as `&self`.
-    #[inline]
-    fn as_ptr(&self) -> *const c_char {
-        match self {
-            Self::Static(cstr) => cstr.as_ptr(),
-            Self::GString(gstring) => gstring_as_ptr(gstring),
-        }
-    }
-}
-
-/// Return value has same lifetime as `gstring`.
+/// Return value has the same lifetime as `gstring`.
 fn gstring_as_ptr(gstring: &GString) -> *const c_char {
     match gstring {
         GString::ForeignOwned(maybe_cstring) => maybe_cstring

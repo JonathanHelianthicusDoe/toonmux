@@ -49,19 +49,72 @@ pub enum Action {
 impl State {
     /// Returns `None` iff xdo instance creation fails.
     pub fn new() -> Option<Self> {
-        let state = Xdo::new().map(|xdo| Self {
-            xdo,
-            hidden: AtomicBool::new(false),
-            main_bindings: Default::default(),
-            controllers: vec![
-                Default::default(),
-                Default::default(),
-                Default::default(),
-            ],
-            routes: Default::default(),
-        });
+        Xdo::new()
+            .map(|xdo| Self {
+                xdo,
+                hidden: AtomicBool::new(false),
+                main_bindings: Default::default(),
+                controllers: vec![
+                    Default::default(),
+                    Default::default(),
+                    Default::default(),
+                ],
+                routes: Default::default(),
+            })
+            .map(|state| {
+                // Ensure that the main binding for "low throw" is the same as
+                // "throw", so that when `Action`s are routed for "low throw",
+                // the correct key to send to the client is stored in that
+                // `Action`.
+                state.main_bindings.low_throw.store(
+                    state.main_bindings.throw.load(Ordering::SeqCst),
+                    Ordering::SeqCst,
+                );
 
-        state
+                // Loading initial routes.
+                {
+                    // Getting a lock on the routing state mutex.
+                    let mut r_lk = state.routes.lock().unwrap();
+
+                    for (ctl_ix, ctl) in state.controllers.iter().enumerate() {
+                        macro_rules! route_action {
+                            ( $action_id:ident, $action_ty:ident ) => {
+                                let key = ctl
+                                    .bindings
+                                    .$action_id
+                                    .load(Ordering::SeqCst);
+                                if key != 0 {
+                                    r_lk.entry(key)
+                                        .or_insert_with(Vec::new)
+                                        .push((
+                                            ctl_ix,
+                                            Action::$action_ty(
+                                                state
+                                                    .main_bindings
+                                                    .$action_id
+                                                    .load(Ordering::SeqCst),
+                                            ),
+                                        ));
+                                }
+                            };
+                        }
+
+                        route_action!(forward, Simple);
+                        route_action!(back, Simple);
+                        route_action!(left, Simple);
+                        route_action!(right, Simple);
+                        route_action!(jump, Simple);
+                        route_action!(dismount, Simple);
+                        route_action!(throw, Simple);
+                        route_action!(low_throw, LowThrow);
+                        route_action!(talk, Talk);
+                    }
+
+                    // Relinquishing lock on the routing state mutex.
+                }
+
+                state
+            })
     }
 
     pub fn is_bound_main(&self, key: Key) -> bool {
@@ -148,10 +201,10 @@ impl Default for Controller {
 impl Default for Bindings {
     fn default() -> Self {
         Self {
-            forward: AtomicKey::new(key::uparrow),
-            back: AtomicKey::new(key::downarrow),
-            left: AtomicKey::new(key::leftarrow),
-            right: AtomicKey::new(key::rightarrow),
+            forward: AtomicKey::new(key::Up),
+            back: AtomicKey::new(key::Down),
+            left: AtomicKey::new(key::Left),
+            right: AtomicKey::new(key::Right),
             jump: AtomicKey::new(key::Control_L),
             dismount: AtomicKey::new(key::Escape),
             throw: AtomicKey::new(key::Delete),
