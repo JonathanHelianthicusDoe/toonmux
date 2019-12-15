@@ -1,7 +1,10 @@
 use crate::xdo::Xdo;
 use gdk::enums::key::{self, Key};
 use rustc_hash::FxHashMap;
-use std::sync::atomic::{AtomicBool, AtomicU32, AtomicU64};
+use std::sync::{
+    atomic::{AtomicBool, AtomicU32, AtomicU64},
+    Mutex,
+};
 
 type AtomicKey = AtomicU32;
 
@@ -11,7 +14,7 @@ pub struct State {
     pub hidden: AtomicBool,
     pub main_bindings: Bindings,
     pub controllers: Vec<Controller>,
-    pub routes: FxHashMap<Key, Vec<(usize, Action)>>,
+    pub routes: Mutex<FxHashMap<Key, Vec<(usize, Action)>>>,
 }
 
 #[derive(Debug)]
@@ -58,6 +61,40 @@ impl State {
             routes: Default::default(),
         })
     }
+
+    pub fn reroute(
+        &self,
+        ctl_ix: usize,
+        old_key: Key,
+        new_key: Key,
+        main_key: Key,
+        action: Option<Action>,
+    ) {
+        // Getting a lock on the routing state mutex.
+        let mut r_lk = self.routes.lock().unwrap();
+
+        // If we are rebinding and not adding a fresh new binding.
+        if old_key != 0 {
+            // Remove the old routing.
+            r_lk.get_mut(&old_key).map(|dests| {
+                dests
+                    .iter()
+                    .enumerate()
+                    .find(|(_, (i, a))| i == &ctl_ix && a.key() == &main_key)
+                    .map(|(j, _)| j)
+                    .map(|j| dests.swap_remove(j));
+            });
+        }
+
+        // Add new routing.
+        if let Some(a) = action {
+            r_lk.entry(new_key)
+                .or_insert_with(Vec::new)
+                .push((ctl_ix, a));
+        }
+
+        // Relinquishing lock on the routing state mutex.
+    }
 }
 
 impl Default for Controller {
@@ -82,6 +119,16 @@ impl Default for Bindings {
             throw: AtomicKey::new(key::Delete),
             low_throw: AtomicKey::new(key::Insert),
             talk: AtomicKey::new(key::Return),
+        }
+    }
+}
+
+impl Action {
+    pub fn key(&self) -> &Key {
+        match self {
+            Self::Simple(key) => key,
+            Self::LowThrow(key) => key,
+            Self::Talk(key) => key,
         }
     }
 }

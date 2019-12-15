@@ -34,9 +34,11 @@ fn main() {
     {
         let state = Arc::clone(&state);
         toonmux.main_window.connect_key_press_event(move |_, e| {
-            if let Some(routes) =
-                state.routes.get(&canonicalize_key(e.get_keyval()))
-            {
+            let routes_state_lock = state.routes.lock().unwrap();
+            let maybe_routes =
+                routes_state_lock.get(&canonicalize_key(e.get_keyval()));
+
+            if let Some(routes) = maybe_routes {
                 for (ctl_ix, action) in routes {
                     let window = state.controllers[*ctl_ix]
                         .window
@@ -44,15 +46,58 @@ fn main() {
 
                     match action {
                         Action::Simple(key) => {
-                            if let Err(code) = state.xdo.send_key_down(window, *key) {
-                                eprintln!("xdo: sending key down failed with code {}", code);
+                            if let Err(code) =
+                                state.xdo.send_key_down(window, *key)
+                            {
+                                eprintln!(
+                                    "xdo: sending key down failed with code \
+                                     {}",
+                                    code,
+                                );
                             }
-                        },
+                        }
                         Action::LowThrow(key) => {
-                            if let Err(code) = state.xdo.send_key(window, *key) {
-                                eprintln!("xdo: sending key failed with code {}", code);
+                            if let Err(code) = state.xdo.send_key(window, *key)
+                            {
+                                eprintln!(
+                                    "xdo: sending key failed with code {}",
+                                    code,
+                                );
                             }
-                        },
+                        }
+                        Action::Talk(_key) => unimplemented!(),
+                    }
+                }
+            }
+
+            Inhibit(false)
+        });
+    }
+    {
+        let state = Arc::clone(&state);
+        toonmux.main_window.connect_key_release_event(move |_, e| {
+            let routes_state_lock = state.routes.lock().unwrap();
+            let maybe_routes =
+                routes_state_lock.get(&canonicalize_key(e.get_keyval()));
+
+            if let Some(routes) = maybe_routes {
+                for (ctl_ix, action) in routes {
+                    let window = state.controllers[*ctl_ix]
+                        .window
+                        .load(Ordering::SeqCst);
+
+                    match action {
+                        Action::Simple(key) => {
+                            if let Err(code) =
+                                state.xdo.send_key_up(window, *key)
+                            {
+                                eprintln!(
+                                    "xdo: sending key up failed with code {}",
+                                    code,
+                                );
+                            }
+                        }
+                        Action::LowThrow(_) => (),
                         Action::Talk(_key) => unimplemented!(),
                     }
                 }
@@ -80,14 +125,15 @@ fn main() {
     }
 
     // Hook up controller binding buttons.
-    for (i, ctl_ui) in toonmux.interface.controller_uis.iter().enumerate() {
+    for (ctl_ix, ctl_ui) in toonmux.interface.controller_uis.iter().enumerate()
+    {
         // Hook up the "+" button.
         {
             let state = Arc::clone(&state);
             ctl_ui.pick_window.connect_clicked(move |_| {
                 if let Some(new_window) = state.xdo.select_window_with_click()
                 {
-                    state.controllers[i]
+                    state.controllers[ctl_ix]
                         .window
                         .store(new_window, Ordering::SeqCst);
                 }
@@ -100,7 +146,7 @@ fn main() {
         dialog_flags.set(DialogFlags::USE_HEADER_BAR, false);
 
         macro_rules! connect_key_binder {
-            ( $key_id:ident, $key_name:expr ) => {{
+            ( $key_id:ident, $key_name:expr, $action_ty:ident ) => {{
                 let state = Arc::clone(&state);
                 let toonmux = Arc::clone(&toonmux);
                 ctl_ui.$key_id.connect_clicked(move |this| {
@@ -132,11 +178,44 @@ fn main() {
                         let state = Arc::clone(&state);
                         key_choose_dialog.connect_key_press_event(
                             move |kcd, e| {
-                                state.controllers[i].bindings.$key_id.store(
-                                    canonicalize_key(e.get_keyval()),
-                                    Ordering::SeqCst,
+                                let old_key = state.controllers[ctl_ix]
+                                    .bindings
+                                    .$key_id
+                                    .load(Ordering::SeqCst);
+                                let new_key = canonicalize_key(e.get_keyval());
+
+                                // If the user remaps the key to the same key,
+                                // we don't need to do anything.
+                                if old_key == new_key {
+                                    kcd.response(ResponseType::Accept);
+
+                                    return Inhibit(false);
+                                }
+
+                                // Store the new binding.
+                                state.controllers[ctl_ix]
+                                    .bindings
+                                    .$key_id
+                                    .store(new_key, Ordering::SeqCst);
+
+                                // Get the main key binding that this key maps
+                                // to (i.e. the one that actually gets sent to
+                                // clients).
+                                let main_key = state
+                                    .main_bindings
+                                    .$key_id
+                                    .load(Ordering::SeqCst);
+
+                                // Perform rerouting.
+                                state.reroute(
+                                    ctl_ix,
+                                    old_key,
+                                    new_key,
+                                    main_key,
+                                    Some(Action::$action_ty(main_key)),
                                 );
 
+                                // Relinquish control to main window.
                                 kcd.response(ResponseType::Accept);
 
                                 Inhibit(false)
@@ -148,32 +227,71 @@ fn main() {
                     let resp = key_choose_dialog.run();
                     key_choose_dialog.destroy();
 
-                    if resp == ResponseType::Accept {
-                        this.set_label(
+                    match resp {
+                        // User pressed a key. State manipulation is already
+                        // done by that handler so we just need to update what
+                        // is displayed in the UI.
+                        ResponseType::Accept => this.set_label(
                             key_name(
-                                state.controllers[i]
+                                state.controllers[ctl_ix]
                                     .bindings
                                     .$key_id
                                     .load(Ordering::SeqCst),
                             )
                             .as_str(),
-                        );
+                        ),
+                        // User pressed "Clear" button. We have to do state
+                        // manipulation here in addition to updating the UI
+                        // because this is effectively the "handler" for the
+                        // "pressing the Clear button" event.
+                        ResponseType::DeleteEvent => {
+                            let old_key = state.controllers[ctl_ix]
+                                .bindings
+                                .$key_id
+                                .load(Ordering::SeqCst);
+                            let new_key = 0;
+
+                            // Store new (and empty) binding.
+                            state.controllers[ctl_ix]
+                                .bindings
+                                .$key_id
+                                .store(new_key, Ordering::SeqCst);
+
+                            // Get the main key binding that this key maps
+                            // to (i.e. the one that actually gets sent to
+                            // clients).
+                            let main_key = state
+                                .main_bindings
+                                .$key_id
+                                .load(Ordering::SeqCst);
+
+                            // Perform rerouting.
+                            state.reroute(
+                                ctl_ix, old_key, new_key, main_key, None,
+                            );
+
+                            this.set_label("");
+                        }
+                        // The user has cancelled.
+                        _ => (),
                     }
                 });
             }};
         }
 
         // Hook up keybinding buttons.
-        connect_key_binder!(forward, "forward");
-        connect_key_binder!(back, "back");
-        connect_key_binder!(left, "left");
-        connect_key_binder!(right, "right");
-        connect_key_binder!(jump, "jump");
-        connect_key_binder!(dismount, "dismount");
-        connect_key_binder!(throw, "throw");
-        connect_key_binder!(low_throw, "low throw");
-        connect_key_binder!(talk, "talk");
+        connect_key_binder!(forward, "forward", Simple);
+        connect_key_binder!(back, "back", Simple);
+        connect_key_binder!(left, "left", Simple);
+        connect_key_binder!(right, "right", Simple);
+        connect_key_binder!(jump, "jump", Simple);
+        connect_key_binder!(dismount, "dismount", Simple);
+        connect_key_binder!(throw, "throw", Simple);
+        connect_key_binder!(low_throw, "low throw", LowThrow);
+        connect_key_binder!(talk, "talk", Talk);
     }
+
+    //println!("{:#?}\n", *state);
 
     // Make all the widgets within the UI visible.
     toonmux.main_window.show_all();

@@ -246,13 +246,17 @@ impl MainBindingsRow {
 
 impl ControllerUi {
     fn new(ctl_state: &state::Controller) -> Self {
+        let mirror = gtk::MenuButton::new();
+        mirror.get_child().map(|c| mirror.remove(&c));
+        mirror.add(&gtk::Label::new(Some("\u{22a3}")));
+
         let pick_window = gtk::Button::new_with_label("+");
         pick_window
             .get_style_context()
             .add_class("suggested-action");
 
         Self {
-            mirror: gtk::MenuButton::new(),
+            mirror,
             pick_window,
             forward: gtk::Button::new_with_label(
                 key_name(ctl_state.bindings.forward.load(Ordering::SeqCst))
