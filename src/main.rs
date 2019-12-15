@@ -8,6 +8,7 @@ mod xdo;
 
 use crate::key::{canonicalize_key, key_name};
 use gtk::{prelude::*, Dialog, DialogFlags, Label, ResponseType};
+use state::Action;
 use std::sync::{atomic::Ordering, Arc};
 
 fn main() {
@@ -28,6 +29,38 @@ fn main() {
     });
     // Initialize the UI's state.
     let toonmux = Arc::new(ui::Toonmux::new(&state));
+
+    // Redirect key presses.
+    {
+        let state = Arc::clone(&state);
+        toonmux.main_window.connect_key_press_event(move |_, e| {
+            if let Some(routes) =
+                state.routes.get(&canonicalize_key(e.get_keyval()))
+            {
+                for (ctl_ix, action) in routes {
+                    let window = state.controllers[*ctl_ix]
+                        .window
+                        .load(Ordering::SeqCst);
+
+                    match action {
+                        Action::Simple(key) => {
+                            if let Err(code) = state.xdo.send_key_down(window, *key) {
+                                eprintln!("xdo: sending key down failed with code {}", code);
+                            }
+                        },
+                        Action::LowThrow(key) => {
+                            if let Err(code) = state.xdo.send_key(window, *key) {
+                                eprintln!("xdo: sending key failed with code {}", code);
+                            }
+                        },
+                        Action::Talk(_key) => unimplemented!(),
+                    }
+                }
+            }
+
+            Inhibit(false)
+        });
+    }
 
     // Hook up expand/contract button.
     {
@@ -79,7 +112,10 @@ fn main() {
                         )),
                         Some(&toonmux.main_window),
                         dialog_flags,
-                        &[("Cancel", ResponseType::Cancel)],
+                        &[
+                            ("Clear", ResponseType::DeleteEvent),
+                            ("Cancel", ResponseType::Cancel),
+                        ],
                     );
                     key_choose_dialog.get_content_area().pack_start(
                         &Label::new(Some(concat!(

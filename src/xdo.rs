@@ -1,6 +1,9 @@
 //! This module is where all of the gross `unsafe` stuff lives.
 
+use gdk::{self, enums::key::Key};
+use glib::GString;
 use libxdo_sys;
+use std::{num::NonZeroI32, os::raw::c_char};
 use x11::xlib::Window;
 
 #[derive(Debug)]
@@ -30,6 +33,52 @@ impl Xdo {
             None
         }
     }
+
+    pub fn send_key_down(
+        &self,
+        window: Window,
+        key: Key,
+    ) -> Result<(), NonZeroI32> {
+        let keyval_name = gdk::keyval_name(key).expect("invalid `Key`");
+
+        let res = unsafe {
+            libxdo_sys::xdo_send_keysequence_window_down(
+                self.handle,
+                window,
+                gstring_as_char_ptr(&keyval_name),
+                0,
+            )
+        };
+
+        if let Some(code) = NonZeroI32::new(res) {
+            Err(code)
+        } else {
+            Ok(())
+        }
+    }
+
+    pub fn send_key(
+        &self,
+        window: Window,
+        key: Key,
+    ) -> Result<(), NonZeroI32> {
+        let keyval_name = gdk::keyval_name(key).expect("invalid `Key`");
+
+        let res = unsafe {
+            libxdo_sys::xdo_send_keysequence_window(
+                self.handle,
+                window,
+                gstring_as_char_ptr(&keyval_name),
+                0,
+            )
+        };
+
+        if let Some(code) = NonZeroI32::new(res) {
+            Err(code)
+        } else {
+            Ok(())
+        }
+    }
 }
 
 impl Drop for Xdo {
@@ -37,5 +86,17 @@ impl Drop for Xdo {
         unsafe {
             libxdo_sys::xdo_free(self.handle);
         }
+    }
+}
+
+fn gstring_as_char_ptr(gstring: &GString) -> *const c_char {
+    match gstring {
+        GString::ForeignOwned(maybe_cstring) => maybe_cstring
+            .as_ref()
+            .expect("ForeignOwned shouldn't be empty")
+            .as_c_str()
+            .as_ptr(),
+        &GString::Borrowed(ptr, _) => ptr,
+        &GString::Owned(mut_ptr, _) => mut_ptr as *const c_char,
     }
 }

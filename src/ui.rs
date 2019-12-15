@@ -7,57 +7,57 @@ use std::sync::atomic::Ordering;
 
 pub struct Toonmux {
     pub main_window: gtk::Window,
-    pub header:      Header,
-    pub interface:   Interface,
+    pub header: Header,
+    pub interface: Interface,
 }
 
 pub struct Header {
-    container:  gtk::HeaderBar,
+    container: gtk::HeaderBar,
     pub expand: gtk::Button,
 }
 
 pub struct Interface {
-    pub container:      gtk::Grid,
-    label_row:          LabelRow,
-    main_bindings_row:  MainBindingsRow,
+    pub container: gtk::Grid,
+    label_row: LabelRow,
+    main_bindings_row: MainBindingsRow,
     pub controller_uis: Vec<ControllerUi>,
 }
 
 struct LabelRow {
-    forward_label:   gtk::Label,
-    back_label:      gtk::Label,
-    left_label:      gtk::Label,
-    right_label:     gtk::Label,
-    jump_label:      gtk::Label,
-    dismount_label:  gtk::Label,
-    throw_label:     gtk::Label,
+    forward_label: gtk::Label,
+    back_label: gtk::Label,
+    left_label: gtk::Label,
+    right_label: gtk::Label,
+    jump_label: gtk::Label,
+    dismount_label: gtk::Label,
+    throw_label: gtk::Label,
     low_throw_label: gtk::Label,
-    talk_label:      gtk::Label,
+    talk_label: gtk::Label,
 }
 
 struct MainBindingsRow {
     mirror_label: gtk::Label,
-    forward:      gtk::Button,
-    back:         gtk::Button,
-    left:         gtk::Button,
-    right:        gtk::Button,
-    jump:         gtk::Button,
-    dismount:     gtk::Button,
-    throw:        gtk::Button,
+    forward: gtk::Button,
+    back: gtk::Button,
+    left: gtk::Button,
+    right: gtk::Button,
+    jump: gtk::Button,
+    dismount: gtk::Button,
+    throw: gtk::Button,
 }
 
 pub struct ControllerUi {
     pub pick_window: gtk::Button,
-    pub mirror:      gtk::MenuButton,
-    pub forward:     gtk::Button,
-    pub back:        gtk::Button,
-    pub left:        gtk::Button,
-    pub right:       gtk::Button,
-    pub jump:        gtk::Button,
-    pub dismount:    gtk::Button,
-    pub throw:       gtk::Button,
-    pub low_throw:   gtk::Button,
-    pub talk:        gtk::Button,
+    pub mirror: gtk::MenuButton,
+    pub forward: gtk::Button,
+    pub back: gtk::Button,
+    pub left: gtk::Button,
+    pub right: gtk::Button,
+    pub jump: gtk::Button,
+    pub dismount: gtk::Button,
+    pub throw: gtk::Button,
+    pub low_throw: gtk::Button,
+    pub talk: gtk::Button,
 }
 
 impl Toonmux {
@@ -194,68 +194,52 @@ impl Interface {
 
 impl LabelRow {
     fn new() -> Self {
-        let forward_label = gtk::Label::new(Some("forward"));
-        let back_label = gtk::Label::new(Some("back"));
-        let left_label = gtk::Label::new(Some("left"));
-        let right_label = gtk::Label::new(Some("right"));
-        let jump_label = gtk::Label::new(Some("jump"));
-        let dismount_label = gtk::Label::new(Some("dismount"));
-        let throw_label = gtk::Label::new(Some("throw"));
-        let low_throw_label = gtk::Label::new(Some("low throw"));
-        let talk_label = gtk::Label::new(Some("talk"));
-
         Self {
-            forward_label,
-            back_label,
-            left_label,
-            right_label,
-            jump_label,
-            dismount_label,
-            throw_label,
-            low_throw_label,
-            talk_label,
+            forward_label: gtk::Label::new(Some("forward")),
+            back_label: gtk::Label::new(Some("back")),
+            left_label: gtk::Label::new(Some("left")),
+            right_label: gtk::Label::new(Some("right")),
+            jump_label: gtk::Label::new(Some("jump")),
+            dismount_label: gtk::Label::new(Some("dismount")),
+            throw_label: gtk::Label::new(Some("throw")),
+            low_throw_label: gtk::Label::new(Some("low throw")),
+            talk_label: gtk::Label::new(Some("talk")),
         }
     }
 }
 
 impl MainBindingsRow {
     fn new(state: &State) -> Self {
-        let mirror_label = gtk::Label::new(Some("mirror"));
-        let forward = gtk::Button::new_with_label(
-            key_name(state.main_bindings.forward.load(Ordering::SeqCst))
-                .as_str(),
-        );
-        let back = gtk::Button::new_with_label(
-            key_name(state.main_bindings.back.load(Ordering::SeqCst)).as_str(),
-        );
-        let left = gtk::Button::new_with_label(
-            key_name(state.main_bindings.left.load(Ordering::SeqCst)).as_str(),
-        );
-        let right = gtk::Button::new_with_label(
-            key_name(state.main_bindings.right.load(Ordering::SeqCst))
-                .as_str(),
-        );
-        let jump = gtk::Button::new_with_label(
-            key_name(state.main_bindings.jump.load(Ordering::SeqCst)).as_str(),
-        );
-        let dismount = gtk::Button::new_with_label(
-            key_name(state.main_bindings.dismount.load(Ordering::SeqCst))
-                .as_str(),
-        );
-        let throw = gtk::Button::new_with_label(
-            key_name(state.main_bindings.throw.load(Ordering::SeqCst))
-                .as_str(),
-        );
-
         Self {
-            mirror_label,
-            forward,
-            back,
-            left,
-            right,
-            jump,
-            dismount,
-            throw,
+            mirror_label: gtk::Label::new(Some("mirror")),
+            forward: gtk::Button::new_with_label(
+                key_name(state.main_bindings.forward.load(Ordering::SeqCst))
+                    .as_str(),
+            ),
+            back: gtk::Button::new_with_label(
+                key_name(state.main_bindings.back.load(Ordering::SeqCst))
+                    .as_str(),
+            ),
+            left: gtk::Button::new_with_label(
+                key_name(state.main_bindings.left.load(Ordering::SeqCst))
+                    .as_str(),
+            ),
+            right: gtk::Button::new_with_label(
+                key_name(state.main_bindings.right.load(Ordering::SeqCst))
+                    .as_str(),
+            ),
+            jump: gtk::Button::new_with_label(
+                key_name(state.main_bindings.jump.load(Ordering::SeqCst))
+                    .as_str(),
+            ),
+            dismount: gtk::Button::new_with_label(
+                key_name(state.main_bindings.dismount.load(Ordering::SeqCst))
+                    .as_str(),
+            ),
+            throw: gtk::Button::new_with_label(
+                key_name(state.main_bindings.throw.load(Ordering::SeqCst))
+                    .as_str(),
+            ),
         }
     }
 }
@@ -266,51 +250,46 @@ impl ControllerUi {
         pick_window
             .get_style_context()
             .add_class("suggested-action");
-        let mirror = gtk::MenuButton::new();
-
-        let forward = gtk::Button::new_with_label(
-            key_name(ctl_state.bindings.forward.load(Ordering::SeqCst))
-                .as_str(),
-        );
-        let back = gtk::Button::new_with_label(
-            key_name(ctl_state.bindings.back.load(Ordering::SeqCst)).as_str(),
-        );
-        let left = gtk::Button::new_with_label(
-            key_name(ctl_state.bindings.left.load(Ordering::SeqCst)).as_str(),
-        );
-        let right = gtk::Button::new_with_label(
-            key_name(ctl_state.bindings.right.load(Ordering::SeqCst)).as_str(),
-        );
-        let jump = gtk::Button::new_with_label(
-            key_name(ctl_state.bindings.jump.load(Ordering::SeqCst)).as_str(),
-        );
-        let dismount = gtk::Button::new_with_label(
-            key_name(ctl_state.bindings.dismount.load(Ordering::SeqCst))
-                .as_str(),
-        );
-        let throw = gtk::Button::new_with_label(
-            key_name(ctl_state.bindings.throw.load(Ordering::SeqCst)).as_str(),
-        );
-        let low_throw = gtk::Button::new_with_label(
-            key_name(ctl_state.bindings.low_throw.load(Ordering::SeqCst))
-                .as_str(),
-        );
-        let talk = gtk::Button::new_with_label(
-            key_name(ctl_state.bindings.talk.load(Ordering::SeqCst)).as_str(),
-        );
 
         Self {
-            mirror,
+            mirror: gtk::MenuButton::new(),
             pick_window,
-            forward,
-            back,
-            left,
-            right,
-            jump,
-            dismount,
-            throw,
-            low_throw,
-            talk,
+            forward: gtk::Button::new_with_label(
+                key_name(ctl_state.bindings.forward.load(Ordering::SeqCst))
+                    .as_str(),
+            ),
+            back: gtk::Button::new_with_label(
+                key_name(ctl_state.bindings.back.load(Ordering::SeqCst))
+                    .as_str(),
+            ),
+            left: gtk::Button::new_with_label(
+                key_name(ctl_state.bindings.left.load(Ordering::SeqCst))
+                    .as_str(),
+            ),
+            right: gtk::Button::new_with_label(
+                key_name(ctl_state.bindings.right.load(Ordering::SeqCst))
+                    .as_str(),
+            ),
+            jump: gtk::Button::new_with_label(
+                key_name(ctl_state.bindings.jump.load(Ordering::SeqCst))
+                    .as_str(),
+            ),
+            dismount: gtk::Button::new_with_label(
+                key_name(ctl_state.bindings.dismount.load(Ordering::SeqCst))
+                    .as_str(),
+            ),
+            throw: gtk::Button::new_with_label(
+                key_name(ctl_state.bindings.throw.load(Ordering::SeqCst))
+                    .as_str(),
+            ),
+            low_throw: gtk::Button::new_with_label(
+                key_name(ctl_state.bindings.low_throw.load(Ordering::SeqCst))
+                    .as_str(),
+            ),
+            talk: gtk::Button::new_with_label(
+                key_name(ctl_state.bindings.talk.load(Ordering::SeqCst))
+                    .as_str(),
+            ),
         }
     }
 }

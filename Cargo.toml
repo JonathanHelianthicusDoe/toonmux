@@ -11,10 +11,11 @@ categories = ["games"]
 license = "GPL-3.0-or-later"
 
 [dependencies]
-gdk = { version = "0.11.0", features = ["v3_22", "embed-lgpl-docs"] }
-glib = "0.8.2"
-gtk = { version = "0.7.0", features = ["v3_22", "embed-lgpl-docs"] }
+gdk = { version = "0.12.0", features = ["v3_22", "embed-lgpl-docs"] }
+glib = "0.9.0"
+gtk = { version = "0.8.0", features = ["v3_22", "embed-lgpl-docs"] }
 libxdo-sys = "0.11.0"
+rustc-hash = "1.0.1"
 x11 = "2.18.1"
 
 [profile.release]
