@@ -19,7 +19,7 @@ pub struct Header {
 pub struct Interface {
     pub container: gtk::Grid,
     label_row: LabelRow,
-    main_bindings_row: MainBindingsRow,
+    pub main_bindings_row: MainBindingsRow,
     pub controller_uis: Vec<ControllerUi>,
 }
 
@@ -35,15 +35,15 @@ struct LabelRow {
     talk_label: gtk::Label,
 }
 
-struct MainBindingsRow {
-    mirror_label: gtk::Label,
-    forward: gtk::Button,
-    back: gtk::Button,
-    left: gtk::Button,
-    right: gtk::Button,
-    jump: gtk::Button,
-    dismount: gtk::Button,
-    throw: gtk::Button,
+pub struct MainBindingsRow {
+    pub mirror_label: gtk::Label,
+    pub forward: gtk::Button,
+    pub back: gtk::Button,
+    pub left: gtk::Button,
+    pub right: gtk::Button,
+    pub jump: gtk::Button,
+    pub dismount: gtk::Button,
+    pub throw: gtk::Button,
 }
 
 pub struct ControllerUi {

@@ -10,6 +10,7 @@ pub enum KeyName {
 }
 
 impl KeyName {
+    #[inline(always)]
     pub fn as_str(&self) -> &str {
         match self {
             Self::Static(s) => s,
@@ -78,6 +79,7 @@ pub fn key_name(key: Key) -> KeyName {
 /// making both of them into the "left" version.
 ///
 /// Something something, two left feet.
+#[inline]
 pub fn canonicalize_key(key: Key) -> Key {
     match key {
         key::Alt_R => key::Alt_L,

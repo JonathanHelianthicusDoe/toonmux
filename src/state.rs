@@ -2,7 +2,7 @@ use crate::xdo::Xdo;
 use gdk::enums::key::{self, Key};
 use rustc_hash::FxHashMap;
 use std::sync::{
-    atomic::{AtomicBool, AtomicU32, AtomicU64},
+    atomic::{AtomicBool, AtomicU32, AtomicU64, Ordering},
     Mutex,
 };
 
@@ -49,7 +49,7 @@ pub enum Action {
 impl State {
     /// Returns `None` iff xdo instance creation fails.
     pub fn new() -> Option<Self> {
-        Xdo::new().map(|xdo| Self {
+        let state = Xdo::new().map(|xdo| Self {
             xdo,
             hidden: AtomicBool::new(false),
             main_bindings: Default::default(),
@@ -59,7 +59,45 @@ impl State {
                 Default::default(),
             ],
             routes: Default::default(),
-        })
+        });
+
+        state
+    }
+
+    pub fn is_bound_main(&self, key: Key) -> bool {
+        self.main_bindings.forward.load(Ordering::SeqCst) == key
+            || self.main_bindings.back.load(Ordering::SeqCst) == key
+            || self.main_bindings.left.load(Ordering::SeqCst) == key
+            || self.main_bindings.right.load(Ordering::SeqCst) == key
+            || self.main_bindings.jump.load(Ordering::SeqCst) == key
+            || self.main_bindings.dismount.load(Ordering::SeqCst) == key
+            || self.main_bindings.throw.load(Ordering::SeqCst) == key
+            || self.main_bindings.talk.load(Ordering::SeqCst) == key
+    }
+
+    pub fn reroute_main(&self, old_key: Key, new_key: Key) {
+        // Getting a lock on the routing state mutex.
+        let mut r_lk = self.routes.lock().unwrap();
+
+        if new_key != 0 {
+            r_lk.values_mut().for_each(|dests| {
+                dests
+                    .iter_mut()
+                    .filter(|(_, a)| a.key() == &old_key)
+                    .for_each(|(_, a)| a.set_key(new_key));
+            });
+        } else {
+            r_lk.values_mut().for_each(|dests| {
+                let mut i = 0;
+                while let Some((_, a)) = dests.get(i) {
+                    if a.key() == &old_key {
+                        dests.swap_remove(i);
+                    } else {
+                        i += 1;
+                    }
+                }
+            });
+        }
     }
 
     pub fn reroute(
@@ -124,11 +162,21 @@ impl Default for Bindings {
 }
 
 impl Action {
+    #[inline(always)]
     pub fn key(&self) -> &Key {
         match self {
             Self::Simple(key) => key,
             Self::LowThrow(key) => key,
             Self::Talk(key) => key,
+        }
+    }
+
+    #[inline(always)]
+    fn set_key(&mut self, key: Key) {
+        match self {
+            Self::Simple(k) => *k = key,
+            Self::LowThrow(k) => *k = key,
+            Self::Talk(k) => *k = key,
         }
     }
 }

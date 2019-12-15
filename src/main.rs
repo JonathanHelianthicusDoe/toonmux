@@ -124,6 +124,148 @@ fn main() {
         });
     }
 
+    // Dialog settings for the "set binding" popup UI.
+    let dialog_flags = {
+        let mut dialog_flags = DialogFlags::empty();
+        dialog_flags.set(DialogFlags::MODAL, true);
+        dialog_flags.set(DialogFlags::DESTROY_WITH_PARENT, true);
+        dialog_flags.set(DialogFlags::USE_HEADER_BAR, false);
+
+        dialog_flags
+    };
+
+    // Hook up main binding buttons.
+    macro_rules! connect_main_key_binder {
+        ( $key_id:ident, $key_name:expr ) => {{
+            let state = Arc::clone(&state);
+            let toonmux_ref = Arc::clone(&toonmux);
+            toonmux.interface.main_bindings_row.$key_id.connect_clicked(
+                move |this| {
+                    let key_choose_dialog = Dialog::new_with_buttons(
+                        Some(concat!(
+                            "Binding main \u{201c}",
+                            $key_name,
+                            "\u{201d} key",
+                        )),
+                        Some(&toonmux_ref.main_window),
+                        dialog_flags,
+                        &[
+                            ("Clear", ResponseType::DeleteEvent),
+                            ("Cancel", ResponseType::Cancel),
+                        ],
+                    );
+                    key_choose_dialog.get_content_area().pack_start(
+                        &Label::new(Some(concat!(
+                            "Press a key to be bound to \u{201c}",
+                            $key_name,
+                            "\u{201d}.",
+                        ))),
+                        true,
+                        false,
+                        4,
+                    );
+
+                    {
+                        let state = Arc::clone(&state);
+                        key_choose_dialog.connect_key_press_event(
+                            move |kcd, e| {
+                                let old_key = state
+                                    .main_bindings
+                                    .$key_id
+                                    .load(Ordering::SeqCst);
+                                let new_key = canonicalize_key(e.get_keyval());
+
+                                // If the user remaps the key to the same key,
+                                // we don't need to do anything.
+                                if old_key == new_key {
+                                    kcd.response(ResponseType::Cancel);
+
+                                    return Inhibit(false);
+                                }
+
+                                // Make sure we aren't registering a duplicate
+                                // main binding.
+                                if state.is_bound_main(new_key) {
+                                    eprintln!(
+                                        "Main bindings may not overlap.",
+                                    );
+                                    kcd.response(ResponseType::Cancel);
+
+                                    return Inhibit(false);
+                                }
+
+                                // Store the new binding.
+                                state
+                                    .main_bindings
+                                    .$key_id
+                                    .store(new_key, Ordering::SeqCst);
+
+                                // Perform rerouting.
+                                state.reroute_main(old_key, new_key);
+
+                                // Relinquish control to main window.
+                                kcd.response(ResponseType::Accept);
+
+                                Inhibit(false)
+                            },
+                        );
+                    }
+
+                    key_choose_dialog.show_all();
+                    let resp = key_choose_dialog.run();
+                    key_choose_dialog.destroy();
+
+                    match resp {
+                        // User pressed a key. State manipulation is already
+                        // done by that handler so we just need to update what
+                        // is displayed in the UI.
+                        ResponseType::Accept => this.set_label(
+                            key_name(
+                                state
+                                    .main_bindings
+                                    .$key_id
+                                    .load(Ordering::SeqCst),
+                            )
+                            .as_str(),
+                        ),
+                        // User pressed "Clear" button. We have to do state
+                        // manipulation here in addition to updating the UI
+                        // because this is effectively the "handler" for the
+                        // "pressing the Clear button" event.
+                        ResponseType::DeleteEvent => {
+                            let old_key = state
+                                .main_bindings
+                                .$key_id
+                                .load(Ordering::SeqCst);
+                            let new_key = 0;
+
+                            // Store new (and empty) binding.
+                            state
+                                .main_bindings
+                                .$key_id
+                                .store(new_key, Ordering::SeqCst);
+
+                            // Perform rerouting.
+                            state.reroute_main(old_key, new_key);
+
+                            this.set_label("");
+                        }
+                        // The user has cancelled.
+                        _ => (),
+                    }
+                },
+            );
+        }};
+    }
+
+    connect_main_key_binder!(forward, "forward");
+    connect_main_key_binder!(back, "back");
+    connect_main_key_binder!(left, "left");
+    connect_main_key_binder!(right, "right");
+    connect_main_key_binder!(jump, "jump");
+    connect_main_key_binder!(dismount, "dismount");
+    connect_main_key_binder!(throw, "throw");
+
     // Hook up controller binding buttons.
     for (ctl_ix, ctl_ui) in toonmux.interface.controller_uis.iter().enumerate()
     {
@@ -139,11 +281,6 @@ fn main() {
                 }
             });
         }
-
-        let mut dialog_flags = DialogFlags::empty();
-        dialog_flags.set(DialogFlags::MODAL, true);
-        dialog_flags.set(DialogFlags::DESTROY_WITH_PARENT, true);
-        dialog_flags.set(DialogFlags::USE_HEADER_BAR, false);
 
         macro_rules! connect_key_binder {
             ( $key_id:ident, $key_name:expr, $action_ty:ident ) => {{
@@ -187,7 +324,7 @@ fn main() {
                                 // If the user remaps the key to the same key,
                                 // we don't need to do anything.
                                 if old_key == new_key {
-                                    kcd.response(ResponseType::Accept);
+                                    kcd.response(ResponseType::Cancel);
 
                                     return Inhibit(false);
                                 }
@@ -290,8 +427,6 @@ fn main() {
         connect_key_binder!(low_throw, "low throw", LowThrow);
         connect_key_binder!(talk, "talk", Talk);
     }
-
-    //println!("{:#?}\n", *state);
 
     // Make all the widgets within the UI visible.
     toonmux.main_window.show_all();

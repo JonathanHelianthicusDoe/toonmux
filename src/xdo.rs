@@ -40,6 +40,7 @@ impl Xdo {
         }
     }
 
+    #[inline]
     pub fn send_key_down(
         &self,
         window: Window,
@@ -66,6 +67,7 @@ impl Xdo {
         }
     }
 
+    #[inline]
     pub fn send_key_up(
         &self,
         window: Window,
@@ -92,6 +94,7 @@ impl Xdo {
         }
     }
 
+    #[inline]
     pub fn send_key(
         &self,
         window: Window,
@@ -149,6 +152,7 @@ impl Drop for Xdo {
 
 impl XdoKeyName {
     /// Return value has same lifetime as `&self`.
+    #[inline]
     fn as_ptr(&self) -> *const c_char {
         match self {
             Self::Static(cstr) => cstr.as_ptr(),
