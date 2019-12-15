@@ -299,8 +299,16 @@ fn main() {
             .map(|c| c.downcast::<gtk::MenuItem>().unwrap())
             .enumerate()
         {
+            if mirror_menu_item
+                .downcast_ref::<gtk::SeparatorMenuItem>()
+                .is_some()
+            {
+                continue;
+            }
+
             let state = Arc::clone(&state);
-            mirror_menu_item.connect_activate(move |mmi| {
+            let toonmux = Arc::clone(&toonmux);
+            mirror_menu_item.connect_activate(move |_| {
                 let ctl = &state.controllers[ctl_ix];
                 let new_mirror = i.wrapping_sub(1);
 
@@ -314,8 +322,20 @@ fn main() {
 
                 // If we do set a mirror (i.e. not "none"), then update the
                 // mirror's `mirrored` set to contain this controller.
-                if i != 0 {
+                if new_mirror != ::std::usize::MAX {
                     state.controllers[new_mirror].mirrored.insert(ctl_ix);
+                }
+
+                if i == 0 {
+                    toonmux.interface.controller_uis[ctl_ix]
+                        .mirror
+                        .button
+                        .set_label("\u{22a3}");
+                } else {
+                    toonmux.interface.controller_uis[ctl_ix]
+                        .mirror
+                        .button
+                        .set_label(&i.to_string());
                 }
             });
         }

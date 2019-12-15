@@ -314,16 +314,26 @@ impl Mirror {
 
         let menu = gtk::Menu::new();
         menu.attach(&gtk::MenuItem::new_with_label("none"), 0, 1, 0, 1);
-        for (ctl_ix_1, i) in
-            (1..=ctl_count).filter(|&i| i != ctl_ix + 1).zip(1..)
-        {
-            menu.attach(
-                &gtk::MenuItem::new_with_label(&ctl_ix_1.to_string()),
-                0,
-                1,
-                i,
-                i + 1,
-            );
+        for i in 1..=ctl_count {
+            let i_u32 = i as u32;
+
+            if i != ctl_ix + 1 {
+                menu.attach(
+                    &gtk::MenuItem::new_with_label(&i.to_string()),
+                    0,
+                    1,
+                    i_u32,
+                    i_u32 + 1,
+                );
+            } else {
+                menu.attach(
+                    &gtk::SeparatorMenuItem::new(),
+                    0,
+                    1,
+                    i_u32,
+                    i_u32 + 1,
+                );
+            }
         }
         menu.show_all();
 
@@ -337,7 +347,7 @@ impl Mirror {
         // FIXME: `.get_children()` allocates.
         let len = self.menu.get_children().len() as u32;
 
-        let new_item = gtk::MenuItem::new_with_label(&(len + 1).to_string());
+        let new_item = gtk::MenuItem::new_with_label(&len.to_string());
         self.menu.attach(&new_item, 0, 1, len, len + 1);
         new_item.show_all();
 
