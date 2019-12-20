@@ -3,8 +3,10 @@ use gdk::enums::key::{self, Key};
 use rustc_hash::FxHashMap;
 use std::sync::{
     atomic::{AtomicBool, AtomicU32, AtomicU64, AtomicUsize, Ordering},
-    Mutex,
+    RwLock,
 };
+
+const USIZE_BITS: usize = std::mem::size_of::<usize>() * 8;
 
 type AtomicKey = AtomicU32;
 
@@ -12,12 +14,18 @@ type AtomicKey = AtomicU32;
 pub struct AtomicBitSet(AtomicUsize);
 
 #[derive(Debug)]
+pub struct BitSetIter {
+    bits: usize,
+    offset: usize,
+}
+
+#[derive(Debug)]
 pub struct State {
     pub xdo: Xdo,
     pub hidden: AtomicBool,
     pub main_bindings: Bindings,
     pub controllers: Vec<Controller>,
-    pub routes: Mutex<FxHashMap<Key, Vec<(usize, Action)>>>,
+    pub routes: RwLock<FxHashMap<Key, Vec<(usize, Action)>>>,
 }
 
 #[derive(Debug)]
@@ -52,16 +60,54 @@ pub enum Action {
 }
 
 impl AtomicBitSet {
+    #[inline(always)]
     pub fn new() -> Self {
         Self(AtomicUsize::new(0))
     }
 
+    #[inline(always)]
     pub fn insert(&self, i: usize) {
         self.0.fetch_or(1 << i, Ordering::SeqCst);
     }
 
+    #[inline(always)]
     pub fn remove(&self, i: usize) {
         self.0.fetch_and(!(1 << i), Ordering::SeqCst);
+    }
+
+    /// Only performs **one** load.
+    #[inline]
+    pub fn iter(&self) -> BitSetIter {
+        let bits = self.0.load(Ordering::SeqCst);
+
+        BitSetIter {
+            bits,
+            // Optimizing for the empty set case.
+            offset: if bits == 0 { USIZE_BITS } else { 0 },
+        }
+    }
+}
+
+impl Iterator for BitSetIter {
+    type Item = usize;
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        while self.offset < USIZE_BITS {
+            let set_bit = if (self.bits & (1 << self.offset)) != 0 {
+                Some(self.offset)
+            } else {
+                None
+            };
+
+            self.offset += 1;
+
+            if set_bit.is_some() {
+                return set_bit;
+            }
+        }
+
+        None
     }
 }
 
@@ -92,8 +138,9 @@ impl State {
 
                 // Loading initial routes.
                 {
-                    // Getting a lock on the routing state mutex.
-                    let mut r_lk = state.routes.lock().unwrap();
+                    // Getting a write lock on the routing state reader-writer
+                    // lock.
+                    let mut r_lk = state.routes.write().unwrap();
 
                     for (ctl_ix, ctl) in state.controllers.iter().enumerate() {
                         macro_rules! route_action {
@@ -129,7 +176,8 @@ impl State {
                         route_action!(talk, Talk);
                     }
 
-                    // Relinquishing lock on the routing state mutex.
+                    // Relinquishing write lock on the routing state
+                    // reader-writer lock.
                 }
 
                 state
@@ -148,8 +196,8 @@ impl State {
     }
 
     pub fn reroute_main(&self, old_key: Key, new_key: Key) {
-        // Getting a lock on the routing state mutex.
-        let mut r_lk = self.routes.lock().unwrap();
+        // Getting a write lock on the routing state reader-writer lock.
+        let mut r_lk = self.routes.write().unwrap();
 
         if new_key != 0 {
             r_lk.values_mut().for_each(|dests| {
@@ -170,6 +218,8 @@ impl State {
                 }
             });
         }
+
+        // Relinquishing write lock on the routing state reader-writer lock.
     }
 
     pub fn reroute(
@@ -180,8 +230,8 @@ impl State {
         main_key: Key,
         action: Option<Action>,
     ) {
-        // Getting a lock on the routing state mutex.
-        let mut r_lk = self.routes.lock().unwrap();
+        // Getting a write lock on the routing state reader-writer lock.
+        let mut r_lk = self.routes.write().unwrap();
 
         // If we are rebinding and not adding a fresh new binding.
         if old_key != 0 {
@@ -203,7 +253,7 @@ impl State {
                 .push((ctl_ix, a));
         }
 
-        // Relinquishing lock on the routing state mutex.
+        // Relinquishing write lock on the routing state reader-writer lock.
     }
 }
 

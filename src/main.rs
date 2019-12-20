@@ -9,7 +9,10 @@ mod xdo;
 use crate::key::{canonicalize_key, key_name};
 use gtk::{prelude::*, Dialog, DialogFlags, Label, ResponseType};
 use state::Action;
-use std::sync::{atomic::Ordering, Arc};
+use std::{
+    iter,
+    sync::{atomic::Ordering, Arc},
+};
 
 fn main() {
     // Initialize GTK.
@@ -34,49 +37,61 @@ fn main() {
     {
         let state = Arc::clone(&state);
         toonmux.main_window.connect_key_press_event(move |_, e| {
-            let routes_state_lock = state.routes.lock().unwrap();
+            // Getting a read lock on the routing state reader-writer lock.
+            let routes_state_lock = state.routes.read().unwrap();
             let maybe_routes =
                 routes_state_lock.get(&canonicalize_key(e.get_keyval()));
 
             if let Some(routes) = maybe_routes {
                 for (ctl_ix, action) in routes {
-                    let window = state.controllers[*ctl_ix]
-                        .window
-                        .load(Ordering::SeqCst);
+                    let main_controller = &state.controllers[*ctl_ix];
 
-                    match action {
-                        Action::Simple(key) => {
-                            if let Err(code) =
-                                state.xdo.send_key_down(window, *key)
-                            {
-                                eprintln!(
-                                    "xdo: sending key down failed with code \
-                                     {}",
-                                    code,
-                                );
+                    for controller in iter::once(main_controller).chain(
+                        main_controller
+                            .mirrored
+                            .iter()
+                            .map(|i| &state.controllers[i]),
+                    ) {
+                        let window = controller.window.load(Ordering::SeqCst);
+
+                        match action {
+                            Action::Simple(key) => {
+                                if let Err(code) =
+                                    state.xdo.send_key_down(window, *key)
+                                {
+                                    eprintln!(
+                                        "xdo: sending key down failed with \
+                                         code {}",
+                                        code,
+                                    );
+                                }
                             }
-                        }
-                        Action::LowThrow(key) => {
-                            if let Err(code) = state.xdo.send_key(window, *key)
-                            {
-                                eprintln!(
-                                    "xdo: sending key failed with code {}",
-                                    code,
-                                );
+                            Action::LowThrow(key) => {
+                                if let Err(code) =
+                                    state.xdo.send_key(window, *key)
+                                {
+                                    eprintln!(
+                                        "xdo: sending key failed with code {}",
+                                        code,
+                                    );
+                                }
                             }
+                            Action::Talk(_key) => todo!(),
                         }
-                        Action::Talk(_key) => unimplemented!(),
                     }
                 }
             }
 
             Inhibit(true)
+
+            // Relinquishing read lock on the routing state reader-writer lock.
         });
     }
     {
         let state = Arc::clone(&state);
         toonmux.main_window.connect_key_release_event(move |_, e| {
-            let routes_state_lock = state.routes.lock().unwrap();
+            // Getting a read lock on the routing state reader-writer lock.
+            let routes_state_lock = state.routes.read().unwrap();
             let maybe_routes =
                 routes_state_lock.get(&canonicalize_key(e.get_keyval()));
 
@@ -98,12 +113,14 @@ fn main() {
                             }
                         }
                         Action::LowThrow(_) => (),
-                        Action::Talk(_key) => unimplemented!(),
+                        Action::Talk(_key) => todo!(),
                     }
                 }
             }
 
             Inhibit(true)
+
+            // Relinquishing read lock on the routing state reader-writer lock.
         });
     }
 
