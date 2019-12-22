@@ -1,14 +1,20 @@
-use crate::xdo::Xdo;
+use crate::{json, xdo::Xdo};
 use gdk::enums::key::{self, Key};
 use rustc_hash::FxHashMap;
-use std::sync::{
-    atomic::{AtomicBool, AtomicU32, AtomicU64, AtomicUsize, Ordering},
-    RwLock,
+use serde_derive::{Deserialize, Serialize};
+use std::{
+    fs::File,
+    io::BufReader,
+    path::Path,
+    sync::{
+        atomic::{AtomicBool, AtomicU32, AtomicU64, AtomicUsize, Ordering},
+        RwLock,
+    },
 };
 
 const USIZE_BITS: usize = std::mem::size_of::<usize>() * 8;
 
-type AtomicKey = AtomicU32;
+pub type AtomicKey = AtomicU32;
 
 #[derive(Debug)]
 pub struct AtomicBitSet(AtomicUsize);
@@ -39,7 +45,7 @@ pub struct Controller {
     pub bindings: Bindings,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct Bindings {
     pub forward: AtomicKey,
     pub back: AtomicKey,
@@ -126,62 +132,91 @@ impl State {
                 ],
                 routes: Default::default(),
             })
-            .map(|state| {
-                // Ensure that the main binding for "low throw" is the same as
-                // "throw", so that when `Action`s are routed for "low throw",
-                // the correct key to send to the client is stored in that
-                // `Action`.
-                state.main_bindings.low_throw.store(
-                    state.main_bindings.throw.load(Ordering::SeqCst),
-                    Ordering::SeqCst,
-                );
-
-                // Loading initial routes.
-                {
-                    // Getting a write lock on the routing state reader-writer
-                    // lock.
-                    let mut r_lk = state.routes.write().unwrap();
-
-                    for (ctl_ix, ctl) in state.controllers.iter().enumerate() {
-                        macro_rules! route_action {
-                            ( $action_id:ident, $action_ty:ident ) => {
-                                let key = ctl
-                                    .bindings
-                                    .$action_id
-                                    .load(Ordering::SeqCst);
-                                if key != 0 {
-                                    r_lk.entry(key)
-                                        .or_insert_with(Vec::new)
-                                        .push((
-                                            ctl_ix,
-                                            Action::$action_ty(
-                                                state
-                                                    .main_bindings
-                                                    .$action_id
-                                                    .load(Ordering::SeqCst),
-                                            ),
-                                        ));
-                                }
-                            };
-                        }
-
-                        route_action!(forward, Simple);
-                        route_action!(back, Simple);
-                        route_action!(left, Simple);
-                        route_action!(right, Simple);
-                        route_action!(jump, Simple);
-                        route_action!(dismount, Simple);
-                        route_action!(throw, Simple);
-                        route_action!(low_throw, LowThrow);
-                        route_action!(talk, Talk);
-                    }
-
-                    // Relinquishing write lock on the routing state
-                    // reader-writer lock.
-                }
+            .map(|mut state| {
+                state.init();
 
                 state
             })
+    }
+
+    pub fn from_json_file<P: AsRef<Path>>(
+        json_path: P,
+    ) -> Result<Self, String> {
+        let f = File::open(json_path).map_err(|e| e.to_string())?;
+        let buf_reader = BufReader::new(f);
+        let json::State {
+            main_bindings,
+            controllers,
+        } = json::State::from_reader(buf_reader)?;
+
+        let controllers: Vec<_> = controllers
+            .into_iter()
+            .map(|c| Controller {
+                window: AtomicU64::new(0),
+                mirror: c.mirror,
+                mirrored: AtomicBitSet::new(),
+                bindings: c.bindings,
+            })
+            .collect();
+        for (i, controller) in controllers.iter().enumerate() {
+            let mirror = controller.mirror.load(Ordering::SeqCst);
+            if mirror != ::std::usize::MAX && mirror != i {
+                controllers.get(mirror).map(|c| c.mirrored.insert(i));
+            }
+        }
+
+        let xdo =
+            Xdo::new().ok_or_else(|| "Failed to initialize xdo".to_owned())?;
+
+        let mut state = Self {
+            xdo,
+            hidden: AtomicBool::new(false),
+            main_bindings,
+            controllers,
+            routes: Default::default(),
+        };
+        state.init();
+
+        Ok(state)
+    }
+
+    fn init(&mut self) {
+        // Ensure that the main binding for "low throw" is the same as "throw",
+        // so that when `Action`s are routed for "low throw", the correct key
+        // to send to the client is stored in that `Action`.
+        *self.main_bindings.low_throw.get_mut() =
+            *self.main_bindings.throw.get_mut();
+
+        // Loading initial routes.
+        let r_lk = self.routes.get_mut().unwrap();
+
+        for (ctl_ix, ctl) in self.controllers.iter().enumerate() {
+            macro_rules! route_action {
+                ( $action_id:ident, $action_ty:ident ) => {
+                    let key = ctl.bindings.$action_id.load(Ordering::SeqCst);
+                    if key != 0 {
+                        r_lk.entry(key).or_insert_with(Vec::new).push((
+                            ctl_ix,
+                            Action::$action_ty(
+                                self.main_bindings
+                                    .$action_id
+                                    .load(Ordering::SeqCst),
+                            ),
+                        ));
+                    }
+                };
+            }
+
+            route_action!(forward, Simple);
+            route_action!(back, Simple);
+            route_action!(left, Simple);
+            route_action!(right, Simple);
+            route_action!(jump, Simple);
+            route_action!(dismount, Simple);
+            route_action!(throw, Simple);
+            route_action!(low_throw, LowThrow);
+            route_action!(talk, Talk);
+        }
     }
 
     pub fn is_bound_main(&self, key: Key) -> bool {

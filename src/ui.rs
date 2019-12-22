@@ -1,9 +1,14 @@
 use crate::{
+    json,
     key::key_name,
     state::{self, State},
 };
 use gtk::prelude::*;
-use std::sync::atomic::Ordering;
+use std::{
+    fs::File,
+    path::PathBuf,
+    sync::{atomic::Ordering, Arc},
+};
 
 pub struct Toonmux {
     pub main_window: gtk::Window,
@@ -66,11 +71,11 @@ pub struct Mirror {
 }
 
 impl Toonmux {
-    pub fn new(state: &State) -> Self {
+    pub fn new(state: Arc<State>, config_path: PathBuf) -> Self {
         let main_window = gtk::Window::new(gtk::WindowType::Toplevel);
 
         let header = Header::new();
-        let interface = Interface::new(state);
+        let interface = Interface::new(&state);
 
         main_window.set_titlebar(Some(&header.container));
         main_window.add(&interface.container);
@@ -81,6 +86,13 @@ impl Toonmux {
 
         // Programs what to do when the exit button is used.
         main_window.connect_delete_event(move |_, _| {
+            match File::create(config_path) {
+                Ok(f) => {
+                    if let Err(e) = json::State::from(state).to_writer(f) {}
+                }
+                Err(ioe) => {}
+            }
+
             gtk::main_quit();
 
             gtk::Inhibit(false)

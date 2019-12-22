@@ -1,6 +1,7 @@
 #![deny(clippy::all)]
 #![deny(deprecated)]
 
+mod json;
 mod key;
 mod state;
 mod ui;
@@ -8,30 +9,37 @@ mod xdo;
 
 use crate::key::{canonicalize_key, key_name};
 use gtk::{prelude::*, Dialog, DialogFlags, Label, ResponseType};
-use state::Action;
+use state::{Action, State};
 use std::{
     iter,
     sync::{atomic::Ordering, Arc},
 };
 
-fn main() {
+fn main() -> Result<(), String> {
     // Initialize GTK.
     if gtk::init().is_err() {
-        eprintln!("Failed to initialize GTK!");
-
-        std::process::exit(1);
+        return Err("Failed to initialize GTK".to_owned());
     }
 
     // Initialize internal state.
-    let state = Arc::new(if let Some(s) = state::State::new() {
-        s
-    } else {
-        eprintln!("Failed to initialize xdo!");
+    let config_path = json::get_config_path()?;
+    println!("Using {} as the config path...", config_path.display());
+    let state = Arc::new(match State::from_json_file(&config_path) {
+        Ok(s) => s,
+        Err(e) => {
+            eprintln!(
+                "Reading from {} failed with \"{}\"; using default \
+                 configuration.",
+                config_path.display(),
+                e,
+            );
 
-        std::process::exit(2)
+            state::State::new()
+                .ok_or_else(|| "Failed to initialize xdo".to_owned())?
+        }
     });
     // Initialize the UI's state.
-    let toonmux = Arc::new(ui::Toonmux::new(&state));
+    let toonmux = Arc::new(ui::Toonmux::new(Arc::clone(&state), config_path));
 
     // Redirect key presses.
     {
@@ -61,7 +69,7 @@ fn main() {
                                 {
                                     eprintln!(
                                         "xdo: sending key down failed with \
-                                         code {}",
+                                         code {}.",
                                         code,
                                     );
                                 }
@@ -71,7 +79,8 @@ fn main() {
                                     state.xdo.send_key(window, *key)
                                 {
                                     eprintln!(
-                                        "xdo: sending key failed with code {}",
+                                        "xdo: sending key failed with code \
+                                         {}.",
                                         code,
                                     );
                                 }
@@ -498,4 +507,6 @@ fn main() {
 
     // Start the GTK main event loop.
     gtk::main();
+
+    Ok(())
 }
