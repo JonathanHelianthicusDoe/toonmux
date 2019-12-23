@@ -67,6 +67,22 @@ That being said, toonmux is still written in Rust in order to stay as
 responsive and lightweight as possible while still being safe (for some value
 of &ldquo;safe&rdquo;).
 
+### Why don&rsquo;t you use any weak `Arc` references?
+
+The only things wrapped in `Arc` are the global &ldquo;state&rdquo; and the
+global UI state. Holding weak references is obviously useless in this case
+because the global state never gets deallocated. Only holding references to the
+&ldquo;root&rdquo; of global state might seem like an unfortunate choice, but
+it works quite well since there is no actual graph structure, ownership-wise
+(except internally in GTK&rsquo;s implementation of the UI).
+
+### Why are all of your atomic accesses sequentially consistent?
+
+Because I&rsquo;m a coward. Also because I expect the synchronization
+bottleneck to be at the level of the `RwLock`s anyways, not the atomics. If
+you&rsquo;re an atomics-semantical wizard, feel free to submit a PR to weaken
+the ordering constraints&hellip;
+
 ## Legal
 
 toonmux is licensed to anyone under the terms of the [GNU General Public

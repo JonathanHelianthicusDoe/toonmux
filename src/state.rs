@@ -30,7 +30,7 @@ pub struct State {
     pub xdo: Xdo,
     pub hidden: AtomicBool,
     pub main_bindings: Bindings,
-    pub controllers: Vec<Controller>,
+    pub controllers: RwLock<Vec<Controller>>,
     pub routes: RwLock<FxHashMap<Key, Vec<(usize, Action)>>>,
 }
 
@@ -82,14 +82,14 @@ impl AtomicBitSet {
     }
 
     /// Only performs **one** load.
-    #[inline]
+    #[inline(always)]
     pub fn iter(&self) -> BitSetIter {
         let bits = self.0.load(Ordering::SeqCst);
 
         BitSetIter {
             bits,
             // Optimizing for the empty set case.
-            offset: if bits == 0 { USIZE_BITS } else { 0 },
+            offset: if bits == 0 { ::std::usize::MAX } else { 0 },
         }
     }
 }
@@ -125,11 +125,11 @@ impl State {
                 xdo,
                 hidden: AtomicBool::new(false),
                 main_bindings: Default::default(),
-                controllers: vec![
+                controllers: RwLock::new(vec![
                     Default::default(),
                     Default::default(),
                     Default::default(),
-                ],
+                ]),
                 routes: Default::default(),
             })
             .map(|mut state| {
@@ -172,7 +172,7 @@ impl State {
             xdo,
             hidden: AtomicBool::new(false),
             main_bindings: main_bindings.into(),
-            controllers,
+            controllers: RwLock::new(controllers),
             routes: Default::default(),
         };
         state.init();
@@ -190,7 +190,9 @@ impl State {
         // Loading initial routes.
         let r_lk = self.routes.get_mut().unwrap();
 
-        for (ctl_ix, ctl) in self.controllers.iter().enumerate() {
+        for (ctl_ix, ctl) in
+            self.controllers.get_mut().unwrap().iter().enumerate()
+        {
             macro_rules! route_action {
                 ( $action_id:ident, $action_ty:ident ) => {
                     let key = ctl.bindings.$action_id.load(Ordering::SeqCst);

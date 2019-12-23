@@ -37,6 +37,8 @@ impl State {
             main_bindings: state_ref.main_bindings.clone(),
             controllers: state_ref
                 .controllers
+                .read()
+                .unwrap()
                 .iter()
                 .map(Controller::from_state_ref)
                 .collect(),
@@ -44,6 +46,7 @@ impl State {
     }
 }
 
+/*
 impl From<state::State> for State {
     #[inline]
     fn from(s: state::State) -> Self {
@@ -53,6 +56,7 @@ impl From<state::State> for State {
         }
     }
 }
+*/
 
 impl Controller {
     #[inline]

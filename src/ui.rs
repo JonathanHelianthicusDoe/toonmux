@@ -8,7 +8,7 @@ use serde_json;
 use std::{
     fs::{self, File},
     path::PathBuf,
-    sync::{atomic::Ordering, Arc},
+    sync::{atomic::Ordering, Arc, RwLock},
 };
 
 pub struct Toonmux {
@@ -20,13 +20,14 @@ pub struct Toonmux {
 pub struct Header {
     container: gtk::HeaderBar,
     pub expand: gtk::Button,
+    pub add: gtk::Button,
 }
 
 pub struct Interface {
     pub container: gtk::Grid,
     label_row: LabelRow,
     pub main_bindings_row: MainBindingsRow,
-    pub controller_uis: Vec<ControllerUi>,
+    pub controller_uis: RwLock<Vec<ControllerUi>>,
 }
 
 struct LabelRow {
@@ -42,6 +43,7 @@ struct LabelRow {
 }
 
 pub struct MainBindingsRow {
+    pub window_label: gtk::Label,
     pub mirror_label: gtk::Label,
     pub forward: gtk::Button,
     pub back: gtk::Button,
@@ -50,6 +52,7 @@ pub struct MainBindingsRow {
     pub jump: gtk::Button,
     pub dismount: gtk::Button,
     pub throw: gtk::Button,
+    pub remove_label: gtk::Label,
 }
 
 pub struct ControllerUi {
@@ -64,6 +67,7 @@ pub struct ControllerUi {
     pub throw: gtk::Button,
     pub low_throw: gtk::Button,
     pub talk: gtk::Button,
+    pub remove: gtk::Button,
 }
 
 pub struct Mirror {
@@ -146,7 +150,14 @@ impl Header {
         let expand = gtk::Button::new_with_label("\u{22ee}");
         container.pack_start(&expand);
 
-        Self { container, expand }
+        let add = gtk::Button::new_with_label("+");
+        container.pack_start(&add);
+
+        Self {
+            container,
+            expand,
+            add,
+        }
     }
 }
 
@@ -158,16 +169,25 @@ impl Interface {
 
         let label_row = LabelRow::new();
         let main_bindings_row = MainBindingsRow::new(state);
-        let controller_uis = state
-            .controllers
-            .iter()
-            .enumerate()
-            .map(|(i, ctl_state)| {
-                ControllerUi::new(ctl_state, i, state.controllers.len())
-            })
-            .collect();
+        let controller_uis = {
+            // Getting a read lock on controller state reader-writer lock.
+            let ctls_state = state.controllers.read().unwrap();
 
-        let interface = Self {
+            let ctl_count = ctls_state.len();
+            RwLock::new(
+                ctls_state
+                    .iter()
+                    .enumerate()
+                    .map(|(i, ctl_state)| {
+                        ControllerUi::new(ctl_state, i, ctl_count)
+                    })
+                    .collect(),
+            )
+
+            // Relinquishing read lock on controller state reader-writer lock.
+        };
+
+        let mut interface = Self {
             container,
             label_row,
             main_bindings_row,
@@ -178,7 +198,7 @@ impl Interface {
         interface
     }
 
-    fn attach(&self) {
+    fn attach(&mut self) {
         self.container
             .attach(&self.label_row.forward_label, 2, 0, 1, 1);
         self.container
@@ -198,6 +218,13 @@ impl Interface {
         self.container
             .attach(&self.label_row.talk_label, 10, 0, 1, 1);
 
+        self.container.attach(
+            &self.main_bindings_row.window_label,
+            0,
+            1,
+            1,
+            1,
+        );
         self.container.attach(
             &self.main_bindings_row.mirror_label,
             1,
@@ -219,9 +246,18 @@ impl Interface {
             .attach(&self.main_bindings_row.dismount, 7, 1, 1, 1);
         self.container
             .attach(&self.main_bindings_row.throw, 8, 1, 1, 1);
+        self.container.attach(
+            &self.main_bindings_row.remove_label,
+            11,
+            1,
+            1,
+            1,
+        );
 
         for (i, ctl_ui) in self
             .controller_uis
+            .get_mut()
+            .unwrap()
             .iter()
             .enumerate()
             .map(|(i, c)| (i as i32, c))
@@ -237,7 +273,38 @@ impl Interface {
             self.container.attach(&ctl_ui.throw, 8, 2 + i, 1, 1);
             self.container.attach(&ctl_ui.low_throw, 9, 2 + i, 1, 1);
             self.container.attach(&ctl_ui.talk, 10, 2 + i, 1, 1);
+            self.container.attach(&ctl_ui.remove, 11, 2 + i, 1, 1);
         }
+    }
+
+    pub fn add_controller(
+        &self,
+        ctl_state: &state::Controller,
+        ctl_count: usize,
+    ) {
+        let ctl_ix = ctl_count - 1;
+        let ctl_ui = ControllerUi::new(ctl_state, ctl_ix, ctl_count);
+
+        let ctl_ix = ctl_ix as i32;
+        self.container
+            .attach(&ctl_ui.pick_window, 0, 2 + ctl_ix, 1, 1);
+        self.container
+            .attach(&ctl_ui.mirror.button, 1, 2 + ctl_ix, 1, 1);
+        self.container.attach(&ctl_ui.forward, 2, 2 + ctl_ix, 1, 1);
+        self.container.attach(&ctl_ui.back, 3, 2 + ctl_ix, 1, 1);
+        self.container.attach(&ctl_ui.left, 4, 2 + ctl_ix, 1, 1);
+        self.container.attach(&ctl_ui.right, 5, 2 + ctl_ix, 1, 1);
+        self.container.attach(&ctl_ui.jump, 6, 2 + ctl_ix, 1, 1);
+        self.container.attach(&ctl_ui.dismount, 7, 2 + ctl_ix, 1, 1);
+        self.container.attach(&ctl_ui.throw, 8, 2 + ctl_ix, 1, 1);
+        self.container
+            .attach(&ctl_ui.low_throw, 9, 2 + ctl_ix, 1, 1);
+        self.container.attach(&ctl_ui.talk, 10, 2 + ctl_ix, 1, 1);
+        self.container.attach(&ctl_ui.remove, 11, 2 + ctl_ix, 1, 1);
+
+        self.controller_uis.write().unwrap().push(ctl_ui);
+
+        self.container.show_all();
     }
 }
 
@@ -260,6 +327,7 @@ impl LabelRow {
 impl MainBindingsRow {
     fn new(state: &State) -> Self {
         Self {
+            window_label: gtk::Label::new(Some("window")),
             mirror_label: gtk::Label::new(Some("mirror")),
             forward: gtk::Button::new_with_label(
                 key_name(state.main_bindings.forward.load(Ordering::SeqCst))
@@ -289,6 +357,7 @@ impl MainBindingsRow {
                 key_name(state.main_bindings.throw.load(Ordering::SeqCst))
                     .as_str(),
             ),
+            remove_label: gtk::Label::new(Some("remove")),
         }
     }
 }
@@ -303,6 +372,9 @@ impl ControllerUi {
         pick_window
             .get_style_context()
             .add_class("suggested-action");
+
+        let remove = gtk::Button::new_with_label("\u{274c}");
+        remove.get_style_context().add_class("destructive-action");
 
         Self {
             pick_window,
@@ -343,6 +415,7 @@ impl ControllerUi {
                 key_name(ctl_state.bindings.talk.load(Ordering::SeqCst))
                     .as_str(),
             ),
+            remove,
         }
     }
 }
