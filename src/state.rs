@@ -306,6 +306,18 @@ impl Default for Controller {
     }
 }
 
+impl Controller {
+    #[inline]
+    pub fn from_template(template: &Self) -> Self {
+        Self {
+            window: AtomicU64::new(0),
+            mirror: AtomicUsize::new(::std::usize::MAX),
+            mirrored: AtomicBitSet::new(),
+            bindings: template.bindings.clone(),
+        }
+    }
+}
+
 impl Clone for Bindings {
     #[inline]
     fn clone(&self) -> Self {

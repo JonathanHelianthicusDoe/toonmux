@@ -179,7 +179,11 @@ fn main() -> Result<(), String> {
                 let mut ctls_state = state.controllers.write().unwrap();
 
                 // Update state.
-                ctls_state.push(Default::default());
+                let new_ctl_state = ctls_state
+                    .last()
+                    .map(|cs| state::Controller::from_template(cs))
+                    .unwrap_or_default();
+                ctls_state.push(new_ctl_state);
 
                 // Relinquishing write lock on the controller state
                 // reader-writer lock.
