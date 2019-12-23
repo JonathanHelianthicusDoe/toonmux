@@ -40,6 +40,23 @@ strip ./target/release/toonmux
 ./target/release/toonmux
 ```
 
+## Features
+
+* [x] Multiple controllers with independent bindings
+* [x] Rebindable main controls (the controls that all controllers&rsquo;
+      bindings map to)
+* [x] Collapsable UI (minimal screen space while still being focusable with the
+      mouse)
+* [x] Ability to have a controller mirror another controller
+* [x] toonmux&rsquo;s state is automatically persisted to disk as JSON
+* [x] Ability to re-bind controller from one window to another
+* [x] Ability to add controllers
+* [ ] Ability to remove controllers
+* [ ] Ability to toggle mirroring globally on and off using a key press
+* [ ] Bindable controls for viewing gags and tasks
+    * [ ] Automatic keep-alive
+* [ ] Speedchat+ support
+
 ## FAQ
 
 ### Why is everything spaghetti code?
