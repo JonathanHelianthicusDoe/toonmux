@@ -155,7 +155,7 @@ impl State {
                 window: AtomicU64::new(0),
                 mirror: c.mirror,
                 mirrored: AtomicBitSet::new(),
-                bindings: c.bindings,
+                bindings: c.bindings.into(),
             })
             .collect();
         for (i, controller) in controllers.iter().enumerate() {
@@ -171,7 +171,7 @@ impl State {
         let mut state = Self {
             xdo,
             hidden: AtomicBool::new(false),
-            main_bindings,
+            main_bindings: main_bindings.into(),
             controllers,
             routes: Default::default(),
         };
@@ -293,6 +293,7 @@ impl State {
 }
 
 impl Default for Controller {
+    #[inline]
     fn default() -> Self {
         Self {
             window: AtomicU64::new(0),
@@ -303,7 +304,25 @@ impl Default for Controller {
     }
 }
 
+impl Clone for Bindings {
+    #[inline]
+    fn clone(&self) -> Self {
+        Self {
+            forward: AtomicKey::new(self.forward.load(Ordering::SeqCst)),
+            back: AtomicKey::new(self.back.load(Ordering::SeqCst)),
+            left: AtomicKey::new(self.left.load(Ordering::SeqCst)),
+            right: AtomicKey::new(self.right.load(Ordering::SeqCst)),
+            jump: AtomicKey::new(self.jump.load(Ordering::SeqCst)),
+            dismount: AtomicKey::new(self.dismount.load(Ordering::SeqCst)),
+            throw: AtomicKey::new(self.throw.load(Ordering::SeqCst)),
+            low_throw: AtomicKey::new(self.low_throw.load(Ordering::SeqCst)),
+            talk: AtomicKey::new(self.talk.load(Ordering::SeqCst)),
+        }
+    }
+}
+
 impl Default for Bindings {
+    #[inline]
     fn default() -> Self {
         Self {
             forward: AtomicKey::new(key::Up),

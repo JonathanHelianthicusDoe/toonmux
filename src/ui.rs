@@ -4,8 +4,9 @@ use crate::{
     state::{self, State},
 };
 use gtk::prelude::*;
+use serde_json;
 use std::{
-    fs::File,
+    fs::{self, File},
     path::PathBuf,
     sync::{atomic::Ordering, Arc},
 };
@@ -86,13 +87,41 @@ impl Toonmux {
 
         // Programs what to do when the exit button is used.
         main_window.connect_delete_event(move |_, _| {
-            match File::create(config_path) {
-                Ok(f) => {
-                    if let Err(e) = json::State::from(state).to_writer(f) {}
-                }
-                Err(ioe) => {}
+            // Save current state to config file.
+            let config_parent_path = config_path.parent().unwrap();
+            if let Err(ioe) = fs::create_dir_all(config_parent_path) {
+                eprintln!(
+                    "Failed to ensure that {} exists as a directory with the \
+                     following error:\n\t{}",
+                    config_parent_path.display(),
+                    ioe,
+                );
             }
 
+            let json_state = json::State::from_state_ref(&state);
+            match File::create(&config_path) {
+                Ok(f) => {
+                    if let Err(e) = json_state.to_writer(f) {
+                        eprintln!(
+                            "Serializing to {} failed with the following \
+                             error:\n\t{}\nThis is what should have been \
+                             written:\n{}",
+                            config_path.display(),
+                            e,
+                            serde_json::to_string_pretty(&json_state).unwrap(),
+                        );
+                    }
+                }
+                Err(ioe) => eprintln!(
+                    "Failed to create the file {} with the following \
+                     error:\n\t{}\nThis is what should have been written:\n{}",
+                    config_path.display(),
+                    ioe,
+                    serde_json::to_string_pretty(&json_state).unwrap(),
+                ),
+            }
+
+            // Actually quit.
             gtk::main_quit();
 
             gtk::Inhibit(false)
