@@ -150,10 +150,12 @@ fn main() -> Result<(), String> {
             let prev_hidden = state.hidden.fetch_nand(true, Ordering::SeqCst);
 
             if !prev_hidden {
+                toonmux_ref.header.add.hide();
                 toonmux_ref.interface.container.hide();
                 toonmux_ref.main_window.resize(1, 1);
             } else {
                 toonmux_ref.interface.container.show();
+                toonmux_ref.header.add.show();
             }
         });
     }
