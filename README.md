@@ -16,15 +16,18 @@ Multi-toon controller for
 **toonmux is in an *ALPHA* state, and should only be used at your own risk!**
 This will continue to be the case until the version of toonmux is `>=0.1.0`.
 
+toonmux adheres to [version 2.0.0 of the Semantic Versioning
+specification](https://semver.org/spec/v2.0.0.html).
+
 ## Install
 
 ### Requirements
 
 * [X11](https://en.wikipedia.org/wiki/X_Window_System)
-* [GTK](https://en.wikipedia.org/wiki/GTK) &ge;3.22 (including development
-  files, `libgtk-3-dev` in Debian)
-* [libxdo](https://www.semicomplete.com/projects/xdotool/) 3.x (including
-  development files, `libxdo-dev` in Debian)
+* [GTK](https://en.wikipedia.org/wiki/GTK) `>=3.22 && <4.0` (including
+  development files, `libgtk-3-dev` in Debian)
+* [libxdo](https://www.semicomplete.com/projects/xdotool/) `>=3.0 && <4.0`
+  (including development files, `libxdo-dev` in Debian)
 * [rustc &amp; cargo](https://rustup.rs/)
 
 ### How
