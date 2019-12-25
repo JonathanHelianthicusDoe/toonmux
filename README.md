@@ -51,7 +51,7 @@ strip ./target/release/toonmux
 * [x] toonmux&rsquo;s state is automatically persisted to disk as JSON
 * [x] Ability to re-bind controller from one window to another
 * [x] Ability to add controllers
-* [ ] Ability to remove controllers
+* [x] Ability to remove controllers
 * [ ] Ability to toggle mirroring globally on and off using a key press
 * [ ] Bindable controls for viewing gags and tasks
     * [ ] Automatic keep-alive
@@ -71,14 +71,15 @@ As a result, toonmux uses [gtk-rs](https://gtk-rs.org/), which are just Rust
 bindings to [GTK](https://en.wikipedia.org/wiki/GTK). Unfortunately, GTK is a
 [C](https://en.wikipedia.org/wiki/C_%28programming_language%29) API that is not
 only geared towards more &ldquo;object-oriented&rdquo;/&ldquo;classical&rdquo;
-(read: spaghetti) approaches to GUI, but also does not in any way respect the
-ownership model of Rust. This means using a lot of atomically reference-counted
-pointers ([`Arc`](https://doc.rust-lang.org/std/sync/struct.Arc.html)) that get
-passed into closures, as well as internal mutability (mostly in the form of
-atomics for toonmux, but also reader-writer locks &amp; mutexes). This is
-essentially writing out explicitly things that are required to be used anyways
-to use GTK safely, but Rust doesn&rsquo;t have the luxury of a large runtime to
-make things easier (c.f. PyGTK).
+(read: [spaghetti](https://en.wikipedia.org/wiki/Spaghetti_code)) approaches to
+GUI, but also does not in any way respect the ownership model of Rust. This
+means using a lot of atomically reference-counted pointers
+([`Arc`](https://doc.rust-lang.org/std/sync/struct.Arc.html)) that get passed
+into closures, as well as internal mutability (mostly in the form of atomics
+for toonmux, but also reader-writer locks &amp; mutexes). This is essentially
+writing out explicitly things that are required to be used anyways to use GTK
+safely, but Rust doesn&rsquo;t have the luxury of a large runtime to make
+things easier (c.f. PyGTK).
 
 That being said, toonmux is still written in Rust in order to stay as
 responsive and lightweight as possible while still being safe (for some value

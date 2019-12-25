@@ -46,18 +46,6 @@ impl State {
     }
 }
 
-/*
-impl From<state::State> for State {
-    #[inline]
-    fn from(s: state::State) -> Self {
-        Self {
-            main_bindings: s.main_bindings.into(),
-            controllers: s.controllers.into_iter().map(Into::into).collect(),
-        }
-    }
-}
-*/
-
 impl Controller {
     #[inline]
     fn from_state_ref(controller_ref: &state::Controller) -> Self {

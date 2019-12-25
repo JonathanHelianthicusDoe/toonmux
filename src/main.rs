@@ -151,11 +151,13 @@ fn main() -> Result<(), String> {
 
             if !prev_hidden {
                 toonmux_ref.header.add.hide();
+                toonmux_ref.header.remove.hide();
                 toonmux_ref.interface.container.hide();
                 toonmux_ref.main_window.resize(1, 1);
             } else {
                 toonmux_ref.interface.container.show();
                 toonmux_ref.header.add.show();
+                toonmux_ref.header.remove.show();
             }
         });
     }
@@ -235,6 +237,17 @@ fn main() -> Result<(), String> {
 
             // Relinquishing read lock on the controller state reader-writer
             // lock.
+        });
+    }
+
+    // Hook up remove-a-controller button.
+    {
+        let state = Arc::clone(&state);
+        let toonmux_ref = Arc::clone(&toonmux);
+        toonmux.header.remove.connect_clicked(move |_| {
+            state.remove_controller(&toonmux_ref.interface);
+            toonmux_ref.interface.remove_controller();
+            toonmux_ref.main_window.resize(1, 1);
         });
     }
 

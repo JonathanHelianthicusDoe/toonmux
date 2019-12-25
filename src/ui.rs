@@ -21,6 +21,7 @@ pub struct Header {
     container: gtk::HeaderBar,
     pub expand: gtk::Button,
     pub add: gtk::Button,
+    pub remove: gtk::Button,
 }
 
 pub struct Interface {
@@ -52,7 +53,6 @@ pub struct MainBindingsRow {
     pub jump: gtk::Button,
     pub dismount: gtk::Button,
     pub throw: gtk::Button,
-    pub remove_label: gtk::Label,
 }
 
 pub struct ControllerUi {
@@ -67,7 +67,6 @@ pub struct ControllerUi {
     pub throw: gtk::Button,
     pub low_throw: gtk::Button,
     pub talk: gtk::Button,
-    pub remove: gtk::Button,
 }
 
 pub struct Mirror {
@@ -151,12 +150,18 @@ impl Header {
         container.pack_start(&expand);
 
         let add = gtk::Button::new_with_label("+");
+        add.get_style_context().add_class("suggested-action");
         container.pack_start(&add);
+
+        let remove = gtk::Button::new_with_label("-");
+        remove.get_style_context().add_class("destructive-action");
+        container.pack_start(&remove);
 
         Self {
             container,
             expand,
             add,
+            remove,
         }
     }
 }
@@ -246,13 +251,6 @@ impl Interface {
             .attach(&self.main_bindings_row.dismount, 7, 1, 1, 1);
         self.container
             .attach(&self.main_bindings_row.throw, 8, 1, 1, 1);
-        self.container.attach(
-            &self.main_bindings_row.remove_label,
-            11,
-            1,
-            1,
-            1,
-        );
 
         for (i, ctl_ui) in self
             .controller_uis
@@ -273,7 +271,6 @@ impl Interface {
             self.container.attach(&ctl_ui.throw, 8, 2 + i, 1, 1);
             self.container.attach(&ctl_ui.low_throw, 9, 2 + i, 1, 1);
             self.container.attach(&ctl_ui.talk, 10, 2 + i, 1, 1);
-            self.container.attach(&ctl_ui.remove, 11, 2 + i, 1, 1);
         }
     }
 
@@ -300,11 +297,24 @@ impl Interface {
         self.container
             .attach(&ctl_ui.low_throw, 9, 2 + ctl_ix, 1, 1);
         self.container.attach(&ctl_ui.talk, 10, 2 + ctl_ix, 1, 1);
-        self.container.attach(&ctl_ui.remove, 11, 2 + ctl_ix, 1, 1);
 
         self.controller_uis.write().unwrap().push(ctl_ui);
 
         self.container.show_all();
+    }
+
+    pub fn remove_controller(&self) {
+        if let Some(removed_ctl) = {
+            let mut ctl_uis = self.controller_uis.write().unwrap();
+
+            ctl_uis.pop()
+        } {
+            removed_ctl.remove(&self.container);
+
+            for ctl in self.controller_uis.read().unwrap().iter() {
+                ctl.mirror.remove_menu_item();
+            }
+        }
     }
 }
 
@@ -357,7 +367,6 @@ impl MainBindingsRow {
                 key_name(state.main_bindings.throw.load(Ordering::SeqCst))
                     .as_str(),
             ),
-            remove_label: gtk::Label::new(Some("remove")),
         }
     }
 }
@@ -372,9 +381,6 @@ impl ControllerUi {
         pick_window
             .get_style_context()
             .add_class("suggested-action");
-
-        let remove = gtk::Button::new_with_label("\u{274c}");
-        remove.get_style_context().add_class("destructive-action");
 
         Self {
             pick_window,
@@ -415,8 +421,22 @@ impl ControllerUi {
                 key_name(ctl_state.bindings.talk.load(Ordering::SeqCst))
                     .as_str(),
             ),
-            remove,
         }
+    }
+
+    fn remove<C: IsA<gtk::Container>>(&self, container: &C) {
+        container.remove(&self.pick_window);
+        container.remove(&self.mirror.menu);
+        container.remove(&self.mirror.button);
+        container.remove(&self.forward);
+        container.remove(&self.back);
+        container.remove(&self.left);
+        container.remove(&self.right);
+        container.remove(&self.jump);
+        container.remove(&self.dismount);
+        container.remove(&self.throw);
+        container.remove(&self.low_throw);
+        container.remove(&self.talk);
     }
 }
 

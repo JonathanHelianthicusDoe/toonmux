@@ -1,5 +1,6 @@
-use crate::{json, xdo::Xdo};
+use crate::{json, ui, xdo::Xdo};
 use gdk::enums::key::{self, Key};
+use gtk::prelude::*;
 use rustc_hash::FxHashMap;
 use serde_derive::{Deserialize, Serialize};
 use std::{
@@ -291,6 +292,50 @@ impl State {
         }
 
         // Relinquishing write lock on the routing state reader-writer lock.
+    }
+
+    /// NOTE/FIXME?: The fact that this method takes &ui::Interface is gross.
+    pub fn remove_controller(&self, interface: &ui::Interface) {
+        // Getting a write lock on the controllers state reader-writer lock.
+        let mut ctls = self.controllers.write().unwrap();
+        ctls.pop();
+        let removed_ix = ctls.len();
+
+        {
+            // Getting a read lock on the controller UIs' reader-writer lock.
+            let ctl_uis = interface.controller_uis.read().unwrap();
+            for (ctl, ctl_ui) in ctls.iter().zip(ctl_uis.iter()) {
+                if ctl.mirror.load(Ordering::SeqCst) == removed_ix {
+                    ctl.mirror.store(::std::usize::MAX, Ordering::SeqCst);
+
+                    ctl_ui.mirror.button.set_label("\u{22a3}");
+                }
+
+                ctl.mirrored.remove(removed_ix);
+            }
+
+            // Relinquishing read lock on the controller UIs' reader-writer
+            // lock.
+        }
+
+        // Getting a write lock on the routing state reader-writer lock.
+        let mut routes = self.routes.write().unwrap();
+
+        for (_, dests) in routes.iter_mut() {
+            let mut i = 0;
+            while let Some((ctl_ix, _)) = dests.get_mut(i) {
+                if *ctl_ix == removed_ix {
+                    dests.swap_remove(i);
+                } else {
+                    i += 1;
+                }
+            }
+        }
+
+        // Relinquishing write lock on the routing state reader-writer lock.
+
+        // Relinquishing write lock on the controllers state reader-writer
+        // lock.
     }
 }
 
