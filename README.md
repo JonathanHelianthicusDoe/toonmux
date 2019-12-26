@@ -42,7 +42,8 @@ strip ./target/release/toonmux
 
 ## Features
 
-* [x] Multiple controllers with independent bindings
+* [x] Multiple controllers (up to 64\* simultaneously) with independent
+      bindings
 * [x] Rebindable main controls (the controls that all controllers&rsquo;
       bindings map to)
 * [x] Collapsable UI (minimal screen space while still being focusable with the
@@ -50,12 +51,15 @@ strip ./target/release/toonmux
 * [x] Ability to have a controller mirror another controller
 * [x] toonmux&rsquo;s state is automatically persisted to disk as JSON
 * [x] Ability to re-bind controller from one window to another
+* [x] Special binding for a &ldquo;low throw&rdquo; of cream pies/evidence
 * [x] Ability to add controllers
 * [x] Ability to remove controllers
 * [ ] Ability to toggle mirroring globally on and off using a key press
 * [ ] Bindable controls for viewing gags and tasks
     * [ ] Automatic keep-alive
 * [ ] Speedchat+ support
+
+\*Actually 32 on 32-bit architectures.
 
 ## FAQ
 
