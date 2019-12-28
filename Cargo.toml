@@ -1,6 +1,6 @@
 [package]
 name = "toonmux"
-version = "0.0.4"
+version = "0.0.5"
 authors = ["JonathanHelianthicusDoe <augiii@protonmail.com>"]
 edition = "2018"
 description = "Toon multiplexer for playing Toontown on X11"

@@ -384,7 +384,11 @@ impl ControllerUi {
 
         Self {
             pick_window,
-            mirror: Mirror::new(ctl_ix, ctl_count),
+            mirror: Mirror::new(
+                ctl_state.mirror.load(Ordering::SeqCst),
+                ctl_ix,
+                ctl_count,
+            ),
             forward: gtk::Button::new_with_label(
                 key_name(ctl_state.bindings.forward.load(Ordering::SeqCst))
                     .as_str(),
@@ -441,10 +445,14 @@ impl ControllerUi {
 }
 
 impl Mirror {
-    fn new(ctl_ix: usize, ctl_count: usize) -> Self {
+    fn new(val: usize, ctl_ix: usize, ctl_count: usize) -> Self {
         let button = gtk::MenuButton::new();
         button.get_child().map(|c| button.remove(&c));
-        button.add(&gtk::Label::new(Some("\u{22a3}")));
+        if val == ::std::usize::MAX {
+            button.add(&gtk::Label::new(Some("\u{22a3}")));
+        } else {
+            button.add(&gtk::Label::new(Some(&(val + 1).to_string())));
+        }
 
         let menu = gtk::Menu::new();
         menu.attach(&gtk::MenuItem::new_with_label("none"), 0, 1, 0, 1);

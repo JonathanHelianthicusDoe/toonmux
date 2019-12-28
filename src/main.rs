@@ -129,9 +129,9 @@ fn main() -> Result<(), String> {
                                         .talking
                                         .toggle(mirrored_or_ctl_ix);
 
-                                    // If this controller was already in the
-                                    // "talking" state, then we've already sent
-                                    // a key down.  So we just send the
+                                    // If this controller was in the "talking"
+                                    // state before, then we've already sent a
+                                    // key down.  So we just send the
                                     // corresponding key up here.
                                     if was_talking {
                                         if let Err(code) =
