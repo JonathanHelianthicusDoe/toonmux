@@ -45,10 +45,37 @@ fn main() -> Result<(), String> {
     {
         let state = Arc::clone(&state);
         toonmux.main_window.connect_key_press_event(move |_, e| {
+            let event_key = canonicalize_key(e.get_keyval());
+
+            // Handle controllers that are in the "talking" state.
+            let talking = !state.talking.is_empty();
+            if talking {
+                // Getting a read lock on the controller state reader-writer
+                // lock.
+                let ctls = state.controllers.read().unwrap();
+
+                for window in state
+                    .talking
+                    .iter()
+                    .map(|i| ctls[i].window.load(Ordering::SeqCst))
+                {
+                    if let Err(code) =
+                        state.xdo.send_key_down(window, event_key)
+                    {
+                        eprintln!(
+                            "xdo: sending key down failed with code {}.",
+                            code,
+                        );
+                    }
+                }
+
+                // Relinquishing read lock on the controller state
+                // reader-writer lock.
+            }
+
             // Getting a read lock on the routing state reader-writer lock.
             let routes_state_lock = state.routes.read().unwrap();
-            let maybe_routes =
-                routes_state_lock.get(&canonicalize_key(e.get_keyval()));
+            let maybe_routes = routes_state_lock.get(&event_key);
 
             if let Some(routes) = maybe_routes {
                 // Getting a read lock on the controller state reader-writer
@@ -58,35 +85,77 @@ fn main() -> Result<(), String> {
                 for (ctl_ix, action) in routes {
                     let main_controller = &ctls[*ctl_ix];
 
-                    for controller in iter::once(main_controller).chain(
-                        main_controller.mirrored.iter().map(|i| &ctls[i]),
+                    for (mirrored_or_ctl_ix, controller) in iter::once((
+                        *ctl_ix,
+                        main_controller,
+                    ))
+                    .chain(
+                        main_controller.mirrored.iter().map(|i| (i, &ctls[i])),
                     ) {
                         let window = controller.window.load(Ordering::SeqCst);
 
                         match action {
                             Action::Simple(key) => {
-                                if let Err(code) =
-                                    state.xdo.send_key_down(window, *key)
-                                {
-                                    eprintln!(
-                                        "xdo: sending key down failed with \
-                                         code {}.",
-                                        code,
-                                    );
+                                if !talking {
+                                    if let Err(code) =
+                                        state.xdo.send_key_down(window, *key)
+                                    {
+                                        eprintln!(
+                                            "xdo: sending key down failed \
+                                             with code {}.",
+                                            code,
+                                        );
+                                    }
                                 }
                             }
                             Action::LowThrow(key) => {
-                                if let Err(code) =
-                                    state.xdo.send_key(window, *key)
-                                {
-                                    eprintln!(
-                                        "xdo: sending key failed with code \
-                                         {}.",
-                                        code,
-                                    );
+                                if !talking {
+                                    if let Err(code) =
+                                        state.xdo.send_key(window, *key)
+                                    {
+                                        eprintln!(
+                                            "xdo: sending key failed with \
+                                             code {}.",
+                                            code,
+                                        );
+                                    }
                                 }
                             }
-                            Action::Talk(_key) => todo!(),
+                            Action::Talk(key) => {
+                                if mirrored_or_ctl_ix != *ctl_ix
+                                    || !controller.has_mirror()
+                                {
+                                    let was_talking = state
+                                        .talking
+                                        .toggle(mirrored_or_ctl_ix);
+
+                                    // If this controller was already in the
+                                    // "talking" state, then we've already sent
+                                    // a key down.  So we just send the
+                                    // corresponding key up here.
+                                    if was_talking {
+                                        if let Err(code) =
+                                            state.xdo.send_key_up(window, *key)
+                                        {
+                                            eprintln!(
+                                                "xdo: sending key up failed \
+                                                 with code {}.",
+                                                code,
+                                            );
+                                        }
+                                    } else {
+                                        if let Err(code) =
+                                            state.xdo.send_key(window, *key)
+                                        {
+                                            eprintln!(
+                                                "xdo: sending key failed with \
+                                                 code {}.",
+                                                code,
+                                            );
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -103,42 +172,70 @@ fn main() -> Result<(), String> {
     {
         let state = Arc::clone(&state);
         toonmux.main_window.connect_key_release_event(move |_, e| {
-            // Getting a read lock on the routing state reader-writer lock.
-            let routes_state_lock = state.routes.read().unwrap();
-            let maybe_routes =
-                routes_state_lock.get(&canonicalize_key(e.get_keyval()));
+            let event_key = canonicalize_key(e.get_keyval());
 
-            if let Some(routes) = maybe_routes {
+            if !state.talking.is_empty() {
+                // Handle controllers that are in the "talking" state.
+
                 // Getting a read lock on the controller state reader-writer
                 // lock.
                 let ctls = state.controllers.read().unwrap();
 
-                for (ctl_ix, action) in routes {
-                    let window = ctls[*ctl_ix].window.load(Ordering::SeqCst);
-
-                    match action {
-                        Action::Simple(key) => {
-                            if let Err(code) =
-                                state.xdo.send_key_up(window, *key)
-                            {
-                                eprintln!(
-                                    "xdo: sending key up failed with code {}",
-                                    code,
-                                );
-                            }
-                        }
-                        Action::LowThrow(_) => (),
-                        Action::Talk(_key) => todo!(),
+                for window in state
+                    .talking
+                    .iter()
+                    .map(|i| ctls[i].window.load(Ordering::SeqCst))
+                {
+                    if let Err(code) = state.xdo.send_key_up(window, event_key)
+                    {
+                        eprintln!(
+                            "xdo: sending key up failed with code {}.",
+                            code,
+                        );
                     }
                 }
 
-                // Relinquishing read lock on the controller state
-                // reader-writer lock.
+            // Relinquishing read lock on the controller state reader-writer
+            // lock.
+            } else {
+                // Getting a read lock on the routing state reader-writer lock.
+                let routes_state_lock = state.routes.read().unwrap();
+                let maybe_routes = routes_state_lock.get(&event_key);
+
+                if let Some(routes) = maybe_routes {
+                    // Getting a read lock on the controller state
+                    // reader-writer lock.
+                    let ctls = state.controllers.read().unwrap();
+
+                    for (ctl_ix, action) in routes {
+                        let window =
+                            ctls[*ctl_ix].window.load(Ordering::SeqCst);
+
+                        match action {
+                            Action::Simple(key) => {
+                                if let Err(code) =
+                                    state.xdo.send_key_up(window, *key)
+                                {
+                                    eprintln!(
+                                    "xdo: sending key up failed with code {}",
+                                    code,
+                                );
+                                }
+                            }
+                            Action::LowThrow(_) => (),
+                            Action::Talk(_) => (),
+                        }
+                    }
+
+                    // Relinquishing read lock on the controller state
+                    // reader-writer lock.
+                }
+
+                // Relinquishing read lock on the routing state reader-writer
+                // lock.
             }
 
             Inhibit(true)
-
-            // Relinquishing read lock on the routing state reader-writer lock.
         });
     }
 

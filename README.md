@@ -54,14 +54,21 @@ strip ./target/release/toonmux
 * [x] Special binding for a &ldquo;low throw&rdquo; of cream pies/evidence
 * [x] Ability to add controllers
 * [x] Ability to remove controllers
+* [x] Speedchat+ support
 * [ ] Ability to toggle mirroring globally on and off using a key press
 * [ ] Bindable controls for viewing gags and tasks
     * [ ] Automatic keep-alive
-* [ ] Speedchat+ support
 
 \*Actually 32 on 32-bit architectures.
 
 ## FAQ
+
+### Why can&rsquo;t I talk using a controller that is mirroring another?
+
+If a controller `A` is mirroring a controller `B`, then `A`&rsquo;s own
+&ldquo;talk&rdquo; hotkey gets suppressed; in this situation, the only way for
+you to use Speedchat+ with controller `A` is by using `B`&rsquo;s hotkey. If
+this is not desired, you can just toggle off mirroring before chatting.
 
 ### Why is everything spaghetti code?
 

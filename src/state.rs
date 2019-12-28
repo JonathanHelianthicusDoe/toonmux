@@ -33,6 +33,7 @@ pub struct State {
     pub main_bindings: Bindings,
     pub controllers: RwLock<Vec<Controller>>,
     pub routes: RwLock<FxHashMap<Key, Vec<(usize, Action)>>>,
+    pub talking: AtomicBitSet,
 }
 
 #[derive(Debug)]
@@ -73,6 +74,11 @@ impl AtomicBitSet {
     }
 
     #[inline(always)]
+    pub fn is_empty(&self) -> bool {
+        self.0.load(Ordering::SeqCst) == 0
+    }
+
+    #[inline(always)]
     pub fn insert(&self, i: usize) {
         self.0.fetch_or(1 << i, Ordering::SeqCst);
     }
@@ -80,6 +86,14 @@ impl AtomicBitSet {
     #[inline(always)]
     pub fn remove(&self, i: usize) {
         self.0.fetch_and(!(1 << i), Ordering::SeqCst);
+    }
+
+    /// Returns the previous value.
+    #[inline(always)]
+    pub fn toggle(&self, i: usize) -> bool {
+        let mask = 1 << i;
+
+        self.0.fetch_xor(mask, Ordering::SeqCst) & mask != 0
     }
 
     /// Only performs **one** load.
@@ -132,6 +146,7 @@ impl State {
                     Default::default(),
                 ]),
                 routes: Default::default(),
+                talking: AtomicBitSet::new(),
             })
             .map(|mut state| {
                 state.init();
@@ -175,6 +190,7 @@ impl State {
             main_bindings: main_bindings.into(),
             controllers: RwLock::new(controllers),
             routes: Default::default(),
+            talking: AtomicBitSet::new(),
         };
         state.init();
 
@@ -360,6 +376,11 @@ impl Controller {
             mirrored: AtomicBitSet::new(),
             bindings: template.bindings.clone(),
         }
+    }
+
+    #[inline(always)]
+    pub fn has_mirror(&self) -> bool {
+        self.mirror.load(Ordering::SeqCst) != ::std::usize::MAX
     }
 }
 
