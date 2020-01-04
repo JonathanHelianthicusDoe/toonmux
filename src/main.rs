@@ -10,10 +10,7 @@ mod xdo;
 use crate::key::{canonicalize_key, key_name};
 use gtk::{prelude::*, Dialog, DialogFlags, Label, ResponseType};
 use state::{Action, State};
-use std::{
-    iter,
-    sync::{atomic::Ordering, Arc},
-};
+use std::sync::{atomic::Ordering, Arc};
 
 fn main() -> Result<(), String> {
     // Initialize GTK.
@@ -44,6 +41,7 @@ fn main() -> Result<(), String> {
     // Redirect key presses.
     {
         let state = Arc::clone(&state);
+        let toonmux_ref = Arc::clone(&toonmux);
         toonmux.main_window.connect_key_press_event(move |_, e| {
             let event_key = canonicalize_key(e.get_keyval());
 
@@ -73,6 +71,19 @@ fn main() -> Result<(), String> {
                 // reader-writer lock.
             }
 
+            // Handle mirror toggling.
+            let mirroring = if !talking
+                && event_key == state.main_bindings.toggle_mirroring()
+            {
+                let mirroring =
+                    !state.mirroring.fetch_nand(true, Ordering::SeqCst);
+                toonmux_ref.header.change_mirroring(mirroring);
+
+                mirroring
+            } else {
+                state.mirroring.load(Ordering::SeqCst)
+            };
+
             // Getting a read lock on the routing state reader-writer lock.
             let routes_state_lock = state.routes.read().unwrap();
             let maybe_routes = routes_state_lock.get(&event_key);
@@ -85,65 +96,31 @@ fn main() -> Result<(), String> {
                 for (ctl_ix, action) in routes {
                     let main_controller = &ctls[*ctl_ix];
 
-                    for (mirrored_or_ctl_ix, controller) in iter::once((
-                        *ctl_ix,
-                        main_controller,
-                    ))
-                    .chain(
-                        main_controller.mirrored.iter().map(|i| (i, &ctls[i])),
-                    ) {
-                        let window = controller.window.load(Ordering::SeqCst);
+                    let handle_action =
+                        |(mirrored_or_ctl_ix, controller): (
+                            usize,
+                            &state::Controller,
+                        )| {
+                            let window =
+                                controller.window.load(Ordering::SeqCst);
 
-                        match action {
-                            Action::Simple(key) => {
-                                if !talking {
-                                    if let Err(code) =
-                                        state.xdo.send_key_down(window, *key)
-                                    {
-                                        eprintln!(
-                                            "xdo: sending key down failed \
-                                             with code {}.",
-                                            code,
-                                        );
-                                    }
-                                }
-                            }
-                            Action::LowThrow(key) => {
-                                if !talking {
-                                    if let Err(code) =
-                                        state.xdo.send_key(window, *key)
-                                    {
-                                        eprintln!(
-                                            "xdo: sending key failed with \
-                                             code {}.",
-                                            code,
-                                        );
-                                    }
-                                }
-                            }
-                            Action::Talk(key) => {
-                                if mirrored_or_ctl_ix != *ctl_ix
-                                    || !controller.has_mirror()
-                                {
-                                    let was_talking = state
-                                        .talking
-                                        .toggle(mirrored_or_ctl_ix);
-
-                                    // If this controller was in the "talking"
-                                    // state before, then we've already sent a
-                                    // key down.  So we just send the
-                                    // corresponding key up here.
-                                    if was_talking {
-                                        if let Err(code) =
-                                            state.xdo.send_key_up(window, *key)
+                            match action {
+                                Action::Simple(key) => {
+                                    if !talking {
+                                        if let Err(code) = state
+                                            .xdo
+                                            .send_key_down(window, *key)
                                         {
                                             eprintln!(
-                                                "xdo: sending key up failed \
+                                                "xdo: sending key down failed \
                                                  with code {}.",
                                                 code,
                                             );
                                         }
-                                    } else {
+                                    }
+                                }
+                                Action::LowThrow(key) => {
+                                    if !talking {
                                         if let Err(code) =
                                             state.xdo.send_key(window, *key)
                                         {
@@ -155,8 +132,53 @@ fn main() -> Result<(), String> {
                                         }
                                     }
                                 }
+                                Action::Talk(key) => {
+                                    if mirrored_or_ctl_ix != *ctl_ix
+                                        || !controller.has_mirror()
+                                    {
+                                        let was_talking = state
+                                            .talking
+                                            .toggle(mirrored_or_ctl_ix);
+
+                                        // If this controller was in the
+                                        // "talking" state before, then we've
+                                        // already sent a key down.  So we just
+                                        // send the corresponding key up here.
+                                        if was_talking {
+                                            if let Err(code) = state
+                                                .xdo
+                                                .send_key_up(window, *key)
+                                            {
+                                                eprintln!(
+                                                    "xdo: sending key up \
+                                                     failed with code {}.",
+                                                    code,
+                                                );
+                                            }
+                                        } else {
+                                            if let Err(code) = state
+                                                .xdo
+                                                .send_key(window, *key)
+                                            {
+                                                eprintln!(
+                                                    "xdo: sending key failed \
+                                                     with code {}.",
+                                                    code,
+                                                );
+                                            }
+                                        }
+                                    }
+                                }
                             }
-                        }
+                        };
+
+                    handle_action((*ctl_ix, main_controller));
+                    if mirroring {
+                        main_controller
+                            .mirrored
+                            .iter()
+                            .map(|i| (i, &ctls[i]))
+                            .for_each(handle_action);
                     }
                 }
 
@@ -198,6 +220,9 @@ fn main() -> Result<(), String> {
             // Relinquishing read lock on the controller state reader-writer
             // lock.
             } else {
+                // Handle mirror toggling.
+                let mirroring = state.mirroring.load(Ordering::SeqCst);
+
                 // Getting a read lock on the routing state reader-writer lock.
                 let routes_state_lock = state.routes.read().unwrap();
                 let maybe_routes = routes_state_lock.get(&event_key);
@@ -208,22 +233,37 @@ fn main() -> Result<(), String> {
                     let ctls = state.controllers.read().unwrap();
 
                     for (ctl_ix, action) in routes {
-                        let window =
-                            ctls[*ctl_ix].window.load(Ordering::SeqCst);
+                        let main_controller = &ctls[*ctl_ix];
 
-                        match action {
-                            Action::Simple(key) => {
-                                if let Err(code) =
-                                    state.xdo.send_key_up(window, *key)
-                                {
-                                    eprintln!(
-                                    "xdo: sending key up failed with code {}",
-                                    code,
-                                );
+                        let handle_action =
+                            |controller: &state::Controller| {
+                                let window =
+                                    controller.window.load(Ordering::SeqCst);
+
+                                match action {
+                                    Action::Simple(key) => {
+                                        if let Err(code) =
+                                            state.xdo.send_key_up(window, *key)
+                                        {
+                                            eprintln!(
+                                                "xdo: sending key up failed \
+                                                 with code {}",
+                                                code,
+                                            );
+                                        }
+                                    }
+                                    Action::LowThrow(_) => (),
+                                    Action::Talk(_) => (),
                                 }
-                            }
-                            Action::LowThrow(_) => (),
-                            Action::Talk(_) => (),
+                            };
+
+                        handle_action(main_controller);
+                        if mirroring {
+                            main_controller
+                                .mirrored
+                                .iter()
+                                .map(|i| &ctls[i])
+                                .for_each(handle_action);
                         }
                     }
 
@@ -256,6 +296,17 @@ fn main() -> Result<(), String> {
                 toonmux_ref.header.add.show();
                 toonmux_ref.header.remove.show();
             }
+        });
+    }
+
+    // Hook up mirror toggling button.
+    {
+        let state = Arc::clone(&state);
+        let toonmux_ref = Arc::clone(&toonmux);
+        toonmux.header.mirroring.connect_clicked(move |_| {
+            toonmux_ref.header.change_mirroring(
+                !state.mirroring.fetch_nand(true, Ordering::SeqCst),
+            );
         });
     }
 
@@ -350,7 +401,7 @@ fn main() -> Result<(), String> {
 
     // Hook up main binding buttons.
     macro_rules! connect_main_key_binder {
-        ( $key_id:ident, $key_name:expr ) => {{
+        ( $key_id:ident, $key_name:expr, $needs_reroute:expr ) => {{
             let state = Arc::clone(&state);
             let toonmux_ref = Arc::clone(&toonmux);
             toonmux.interface.main_bindings_row.$key_id.connect_clicked(
@@ -415,7 +466,9 @@ fn main() -> Result<(), String> {
                                     .store(new_key, Ordering::SeqCst);
 
                                 // Perform rerouting.
-                                state.reroute_main(old_key, new_key);
+                                if $needs_reroute {
+                                    state.reroute_main(old_key, new_key);
+                                }
 
                                 // Relinquish control to main window.
                                 kcd.response(ResponseType::Accept);
@@ -455,7 +508,9 @@ fn main() -> Result<(), String> {
                                 .swap(new_key, Ordering::SeqCst);
 
                             // Perform rerouting.
-                            state.reroute_main(old_key, new_key);
+                            if $needs_reroute {
+                                state.reroute_main(old_key, new_key);
+                            }
 
                             this.set_label("");
                         }
@@ -467,13 +522,14 @@ fn main() -> Result<(), String> {
         }};
     }
 
-    connect_main_key_binder!(forward, "forward");
-    connect_main_key_binder!(back, "back");
-    connect_main_key_binder!(left, "left");
-    connect_main_key_binder!(right, "right");
-    connect_main_key_binder!(jump, "jump");
-    connect_main_key_binder!(dismount, "dismount");
-    connect_main_key_binder!(throw, "throw");
+    connect_main_key_binder!(forward, "forward", true);
+    connect_main_key_binder!(back, "back", true);
+    connect_main_key_binder!(left, "left", true);
+    connect_main_key_binder!(right, "right", true);
+    connect_main_key_binder!(jump, "jump", true);
+    connect_main_key_binder!(dismount, "dismount", true);
+    connect_main_key_binder!(throw, "throw", true);
+    connect_main_key_binder!(toggle_mirroring, "toggle mirroring", false);
 
     // Hook up controller UI buttons.
     hook_up_controller_uis(&state, &toonmux, dialog_flags);
@@ -597,10 +653,7 @@ fn hook_up_controller_ui(
                             // Get the main key binding that this key maps to
                             // (i.e. the one that actually gets sent to
                             // clients).
-                            let main_key = state
-                                .main_bindings
-                                .$key_id
-                                .load(Ordering::SeqCst);
+                            let main_key = state.main_bindings.$key_id();
 
                             // Perform rerouting.
                             state.reroute(
@@ -651,8 +704,7 @@ fn hook_up_controller_ui(
 
                         // Get the main key binding that this key maps to (i.e.
                         // the one that actually gets sent to clients).
-                        let main_key =
-                            state.main_bindings.$key_id.load(Ordering::SeqCst);
+                        let main_key = state.main_bindings.$key_id();
 
                         // Perform rerouting.
                         state

@@ -30,7 +30,8 @@ pub struct BitSetIter {
 pub struct State {
     pub xdo: Xdo,
     pub hidden: AtomicBool,
-    pub main_bindings: Bindings,
+    pub mirroring: AtomicBool,
+    pub main_bindings: MainBindings,
     pub controllers: RwLock<Vec<Controller>>,
     pub routes: RwLock<FxHashMap<Key, Vec<(usize, Action)>>>,
     pub talking: AtomicBitSet,
@@ -45,6 +46,19 @@ pub struct Controller {
     pub mirror: AtomicUsize,
     pub mirrored: AtomicBitSet,
     pub bindings: Bindings,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub struct MainBindings {
+    pub forward: AtomicKey,
+    pub back: AtomicKey,
+    pub left: AtomicKey,
+    pub right: AtomicKey,
+    pub jump: AtomicKey,
+    pub dismount: AtomicKey,
+    pub throw: AtomicKey,
+    pub talk: AtomicKey,
+    pub toggle_mirroring: AtomicKey,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -139,6 +153,7 @@ impl State {
             .map(|xdo| Self {
                 xdo,
                 hidden: AtomicBool::new(false),
+                mirroring: AtomicBool::new(true),
                 main_bindings: Default::default(),
                 controllers: RwLock::new(vec![
                     Default::default(),
@@ -187,6 +202,7 @@ impl State {
         let mut state = Self {
             xdo,
             hidden: AtomicBool::new(false),
+            mirroring: AtomicBool::new(true),
             main_bindings: main_bindings.into(),
             controllers: RwLock::new(controllers),
             routes: Default::default(),
@@ -198,12 +214,6 @@ impl State {
     }
 
     fn init(&mut self) {
-        // Ensure that the main binding for "low throw" is the same as "throw",
-        // so that when `Action`s are routed for "low throw", the correct key
-        // to send to the client is stored in that `Action`.
-        *self.main_bindings.low_throw.get_mut() =
-            *self.main_bindings.throw.get_mut();
-
         // Loading initial routes.
         let r_lk = self.routes.get_mut().unwrap();
 
@@ -217,9 +227,7 @@ impl State {
                         r_lk.entry(key).or_insert_with(Vec::new).push((
                             ctl_ix,
                             Action::$action_ty(
-                                self.main_bindings
-                                    .$action_id
-                                    .load(Ordering::SeqCst),
+                                self.main_bindings.$action_id(),
                             ),
                         ));
                     }
@@ -381,6 +389,95 @@ impl Controller {
     #[inline(always)]
     pub fn has_mirror(&self) -> bool {
         self.mirror.load(Ordering::SeqCst) != ::std::usize::MAX
+    }
+}
+
+impl MainBindings {
+    #[inline(always)]
+    pub fn forward(&self) -> Key {
+        self.forward.load(Ordering::SeqCst)
+    }
+
+    #[inline(always)]
+    pub fn back(&self) -> Key {
+        self.back.load(Ordering::SeqCst)
+    }
+
+    #[inline(always)]
+    pub fn left(&self) -> Key {
+        self.left.load(Ordering::SeqCst)
+    }
+
+    #[inline(always)]
+    pub fn right(&self) -> Key {
+        self.right.load(Ordering::SeqCst)
+    }
+
+    #[inline(always)]
+    pub fn jump(&self) -> Key {
+        self.jump.load(Ordering::SeqCst)
+    }
+
+    #[inline(always)]
+    pub fn dismount(&self) -> Key {
+        self.dismount.load(Ordering::SeqCst)
+    }
+
+    #[inline(always)]
+    pub fn throw(&self) -> Key {
+        self.throw.load(Ordering::SeqCst)
+    }
+
+    #[inline(always)]
+    pub fn talk(&self) -> Key {
+        self.talk.load(Ordering::SeqCst)
+    }
+
+    #[inline(always)]
+    pub fn toggle_mirroring(&self) -> Key {
+        self.toggle_mirroring.load(Ordering::SeqCst)
+    }
+
+    /// One of these things is not like the others...
+    #[inline(always)]
+    pub fn low_throw(&self) -> Key {
+        self.throw()
+    }
+}
+
+impl Clone for MainBindings {
+    #[inline]
+    fn clone(&self) -> Self {
+        Self {
+            forward: AtomicKey::new(self.forward.load(Ordering::SeqCst)),
+            back: AtomicKey::new(self.back.load(Ordering::SeqCst)),
+            left: AtomicKey::new(self.left.load(Ordering::SeqCst)),
+            right: AtomicKey::new(self.right.load(Ordering::SeqCst)),
+            jump: AtomicKey::new(self.jump.load(Ordering::SeqCst)),
+            dismount: AtomicKey::new(self.dismount.load(Ordering::SeqCst)),
+            throw: AtomicKey::new(self.throw.load(Ordering::SeqCst)),
+            talk: AtomicKey::new(self.talk.load(Ordering::SeqCst)),
+            toggle_mirroring: AtomicKey::new(
+                self.toggle_mirroring.load(Ordering::SeqCst),
+            ),
+        }
+    }
+}
+
+impl Default for MainBindings {
+    #[inline]
+    fn default() -> Self {
+        Self {
+            forward: AtomicKey::new(key::Up),
+            back: AtomicKey::new(key::Down),
+            left: AtomicKey::new(key::Left),
+            right: AtomicKey::new(key::Right),
+            jump: AtomicKey::new(key::Control_L),
+            dismount: AtomicKey::new(key::Escape),
+            throw: AtomicKey::new(key::Delete),
+            talk: AtomicKey::new(key::Return),
+            toggle_mirroring: AtomicKey::new(key::Shift_L),
+        }
     }
 }
 

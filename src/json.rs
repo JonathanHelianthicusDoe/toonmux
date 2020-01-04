@@ -9,7 +9,7 @@ use std::{
 
 #[derive(Serialize, Deserialize)]
 pub struct State {
-    pub main_bindings: state::Bindings,
+    pub main_bindings: state::MainBindings,
     pub controllers: Vec<Controller>,
 }
 

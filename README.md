@@ -55,7 +55,7 @@ strip ./target/release/toonmux
 * [x] Ability to add controllers
 * [x] Ability to remove controllers
 * [x] Speedchat+ support
-* [ ] Ability to toggle mirroring globally on and off using a key press
+* [x] Ability to toggle mirroring globally on and off using a key press
 * [ ] Bindable controls for viewing gags and tasks
     * [ ] Automatic keep-alive
 

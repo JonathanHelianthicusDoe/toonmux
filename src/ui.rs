@@ -20,6 +20,7 @@ pub struct Toonmux {
 pub struct Header {
     container: gtk::HeaderBar,
     pub expand: gtk::Button,
+    pub mirroring: gtk::Button,
     pub add: gtk::Button,
     pub remove: gtk::Button,
 }
@@ -53,6 +54,7 @@ pub struct MainBindingsRow {
     pub jump: gtk::Button,
     pub dismount: gtk::Button,
     pub throw: gtk::Button,
+    pub toggle_mirroring: gtk::Button,
 }
 
 pub struct ControllerUi {
@@ -149,6 +151,9 @@ impl Header {
         let expand = gtk::Button::new_with_label("\u{22ee}");
         container.pack_start(&expand);
 
+        let mirroring = gtk::Button::new_with_label("\u{22a3}");
+        container.pack_start(&mirroring);
+
         let add = gtk::Button::new_with_label("+");
         add.get_style_context().add_class("suggested-action");
         container.pack_start(&add);
@@ -160,8 +165,17 @@ impl Header {
         Self {
             container,
             expand,
+            mirroring,
             add,
             remove,
+        }
+    }
+
+    pub fn change_mirroring(&self, to: bool) {
+        if to {
+            self.mirroring.set_label("\u{22a3}");
+        } else {
+            self.mirroring.set_label("\u{1f6c7}");
         }
     }
 }
@@ -204,6 +218,13 @@ impl Interface {
     }
 
     fn attach(&mut self) {
+        self.container.attach(
+            &self.main_bindings_row.mirror_label,
+            1,
+            0,
+            1,
+            1,
+        );
         self.container
             .attach(&self.label_row.forward_label, 2, 0, 1, 1);
         self.container
@@ -231,7 +252,7 @@ impl Interface {
             1,
         );
         self.container.attach(
-            &self.main_bindings_row.mirror_label,
+            &self.main_bindings_row.toggle_mirroring,
             1,
             1,
             1,
@@ -340,32 +361,28 @@ impl MainBindingsRow {
             window_label: gtk::Label::new(Some("window")),
             mirror_label: gtk::Label::new(Some("mirror")),
             forward: gtk::Button::new_with_label(
-                key_name(state.main_bindings.forward.load(Ordering::SeqCst))
-                    .as_str(),
+                key_name(state.main_bindings.forward()).as_str(),
             ),
             back: gtk::Button::new_with_label(
-                key_name(state.main_bindings.back.load(Ordering::SeqCst))
-                    .as_str(),
+                key_name(state.main_bindings.back()).as_str(),
             ),
             left: gtk::Button::new_with_label(
-                key_name(state.main_bindings.left.load(Ordering::SeqCst))
-                    .as_str(),
+                key_name(state.main_bindings.left()).as_str(),
             ),
             right: gtk::Button::new_with_label(
-                key_name(state.main_bindings.right.load(Ordering::SeqCst))
-                    .as_str(),
+                key_name(state.main_bindings.right()).as_str(),
             ),
             jump: gtk::Button::new_with_label(
-                key_name(state.main_bindings.jump.load(Ordering::SeqCst))
-                    .as_str(),
+                key_name(state.main_bindings.jump()).as_str(),
             ),
             dismount: gtk::Button::new_with_label(
-                key_name(state.main_bindings.dismount.load(Ordering::SeqCst))
-                    .as_str(),
+                key_name(state.main_bindings.dismount()).as_str(),
             ),
             throw: gtk::Button::new_with_label(
-                key_name(state.main_bindings.throw.load(Ordering::SeqCst))
-                    .as_str(),
+                key_name(state.main_bindings.throw()).as_str(),
+            ),
+            toggle_mirroring: gtk::Button::new_with_label(
+                key_name(state.main_bindings.toggle_mirroring()).as_str(),
             ),
         }
     }
@@ -456,7 +473,7 @@ impl Mirror {
 
         let menu = gtk::Menu::new();
         menu.attach(&gtk::MenuItem::new_with_label("none"), 0, 1, 0, 1);
-        for i in 1..=ctl_count {
+        for i in 1..(ctl_count + 1) {
             let i_u32 = i as u32;
 
             if i != ctl_ix + 1 {
