@@ -1,8 +1,9 @@
 use crate::{json, ui, xdo::Xdo};
-use gdk::enums::key::{self, Key};
+use gdk::keys::{self, Key};
+use glib::translate::FromGlib;
 use gtk::prelude::*;
 use rustc_hash::FxHashMap;
-use serde_derive::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize};
 use std::{
     fs::File,
     io::BufReader,
@@ -74,7 +75,7 @@ pub struct Bindings {
     pub talk: AtomicKey,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Action {
     Simple(Key),
     LowThrow(Key),
@@ -224,12 +225,14 @@ impl State {
                 ( $action_id:ident, $action_ty:ident ) => {
                     let key = ctl.bindings.$action_id.load(Ordering::SeqCst);
                     if key != 0 {
-                        r_lk.entry(key).or_insert_with(Vec::new).push((
-                            ctl_ix,
-                            Action::$action_ty(
-                                self.main_bindings.$action_id(),
-                            ),
-                        ));
+                        r_lk.entry(Key::from_glib(key))
+                            .or_insert_with(Vec::new)
+                            .push((
+                                ctl_ix,
+                                Action::$action_ty(
+                                    self.main_bindings.$action_id(),
+                                ),
+                            ));
                     }
                 };
             }
@@ -246,33 +249,33 @@ impl State {
         }
     }
 
-    pub fn is_bound_main(&self, key: Key) -> bool {
-        self.main_bindings.forward.load(Ordering::SeqCst) == key
-            || self.main_bindings.back.load(Ordering::SeqCst) == key
-            || self.main_bindings.left.load(Ordering::SeqCst) == key
-            || self.main_bindings.right.load(Ordering::SeqCst) == key
-            || self.main_bindings.jump.load(Ordering::SeqCst) == key
-            || self.main_bindings.dismount.load(Ordering::SeqCst) == key
-            || self.main_bindings.throw.load(Ordering::SeqCst) == key
-            || self.main_bindings.talk.load(Ordering::SeqCst) == key
+    pub fn is_bound_main(&self, key: &Key) -> bool {
+        self.main_bindings.forward.load(Ordering::SeqCst) == **key
+            || self.main_bindings.back.load(Ordering::SeqCst) == **key
+            || self.main_bindings.left.load(Ordering::SeqCst) == **key
+            || self.main_bindings.right.load(Ordering::SeqCst) == **key
+            || self.main_bindings.jump.load(Ordering::SeqCst) == **key
+            || self.main_bindings.dismount.load(Ordering::SeqCst) == **key
+            || self.main_bindings.throw.load(Ordering::SeqCst) == **key
+            || self.main_bindings.talk.load(Ordering::SeqCst) == **key
     }
 
-    pub fn reroute_main(&self, old_key: Key, new_key: Key) {
+    pub fn reroute_main(&self, old_key: &Key, new_key: &Key) {
         // Getting a write lock on the routing state reader-writer lock.
         let mut r_lk = self.routes.write().unwrap();
 
-        if new_key != 0 {
+        if **new_key != 0 {
             r_lk.values_mut().for_each(|dests| {
                 dests
                     .iter_mut()
-                    .filter(|(_, a)| a.key() == &old_key)
-                    .for_each(|(_, a)| a.set_key(new_key));
+                    .filter(|(_, a)| a.key() == old_key)
+                    .for_each(|(_, a)| a.set_key(new_key.clone()));
             });
         } else {
             r_lk.values_mut().for_each(|dests| {
                 let mut i = 0;
                 while let Some((_, a)) = dests.get(i) {
-                    if a.key() == &old_key {
+                    if a.key() == old_key {
                         dests.swap_remove(i);
                     } else {
                         i += 1;
@@ -287,22 +290,22 @@ impl State {
     pub fn reroute(
         &self,
         ctl_ix: usize,
-        old_key: Key,
-        new_key: Key,
-        main_key: Key,
+        old_key: &Key,
+        new_key: &Key,
+        main_key: &Key,
         action: Option<Action>,
     ) {
         // Getting a write lock on the routing state reader-writer lock.
         let mut r_lk = self.routes.write().unwrap();
 
         // If we are rebinding and not adding a fresh new binding.
-        if old_key != 0 {
+        if **old_key != 0 {
             // Remove the old routing.
             r_lk.get_mut(&old_key).map(|dests| {
                 dests
                     .iter()
                     .enumerate()
-                    .find(|(_, (i, a))| i == &ctl_ix && a.key() == &main_key)
+                    .find(|(_, (i, a))| i == &ctl_ix && a.key() == main_key)
                     .map(|(j, _)| j)
                     .map(|j| dests.swap_remove(j));
             });
@@ -310,7 +313,7 @@ impl State {
 
         // Add new routing.
         if let Some(a) = action {
-            r_lk.entry(new_key)
+            r_lk.entry(new_key.clone())
                 .or_insert_with(Vec::new)
                 .push((ctl_ix, a));
         }
@@ -395,47 +398,47 @@ impl Controller {
 impl MainBindings {
     #[inline(always)]
     pub fn forward(&self) -> Key {
-        self.forward.load(Ordering::SeqCst)
+        Key::from_glib(self.forward.load(Ordering::SeqCst))
     }
 
     #[inline(always)]
     pub fn back(&self) -> Key {
-        self.back.load(Ordering::SeqCst)
+        Key::from_glib(self.back.load(Ordering::SeqCst))
     }
 
     #[inline(always)]
     pub fn left(&self) -> Key {
-        self.left.load(Ordering::SeqCst)
+        Key::from_glib(self.left.load(Ordering::SeqCst))
     }
 
     #[inline(always)]
     pub fn right(&self) -> Key {
-        self.right.load(Ordering::SeqCst)
+        Key::from_glib(self.right.load(Ordering::SeqCst))
     }
 
     #[inline(always)]
     pub fn jump(&self) -> Key {
-        self.jump.load(Ordering::SeqCst)
+        Key::from_glib(self.jump.load(Ordering::SeqCst))
     }
 
     #[inline(always)]
     pub fn dismount(&self) -> Key {
-        self.dismount.load(Ordering::SeqCst)
+        Key::from_glib(self.dismount.load(Ordering::SeqCst))
     }
 
     #[inline(always)]
     pub fn throw(&self) -> Key {
-        self.throw.load(Ordering::SeqCst)
+        Key::from_glib(self.throw.load(Ordering::SeqCst))
     }
 
     #[inline(always)]
     pub fn talk(&self) -> Key {
-        self.talk.load(Ordering::SeqCst)
+        Key::from_glib(self.talk.load(Ordering::SeqCst))
     }
 
     #[inline(always)]
     pub fn toggle_mirroring(&self) -> Key {
-        self.toggle_mirroring.load(Ordering::SeqCst)
+        Key::from_glib(self.toggle_mirroring.load(Ordering::SeqCst))
     }
 
     /// One of these things is not like the others...
@@ -468,15 +471,15 @@ impl Default for MainBindings {
     #[inline]
     fn default() -> Self {
         Self {
-            forward: AtomicKey::new(key::Up),
-            back: AtomicKey::new(key::Down),
-            left: AtomicKey::new(key::Left),
-            right: AtomicKey::new(key::Right),
-            jump: AtomicKey::new(key::Control_L),
-            dismount: AtomicKey::new(key::Escape),
-            throw: AtomicKey::new(key::Delete),
-            talk: AtomicKey::new(key::Return),
-            toggle_mirroring: AtomicKey::new(key::Shift_L),
+            forward: AtomicKey::new(*keys::constants::Up),
+            back: AtomicKey::new(*keys::constants::Down),
+            left: AtomicKey::new(*keys::constants::Left),
+            right: AtomicKey::new(*keys::constants::Right),
+            jump: AtomicKey::new(*keys::constants::Control_L),
+            dismount: AtomicKey::new(*keys::constants::Escape),
+            throw: AtomicKey::new(*keys::constants::Delete),
+            talk: AtomicKey::new(*keys::constants::Return),
+            toggle_mirroring: AtomicKey::new(*keys::constants::Shift_L),
         }
     }
 }
@@ -502,15 +505,15 @@ impl Default for Bindings {
     #[inline]
     fn default() -> Self {
         Self {
-            forward: AtomicKey::new(key::Up),
-            back: AtomicKey::new(key::Down),
-            left: AtomicKey::new(key::Left),
-            right: AtomicKey::new(key::Right),
-            jump: AtomicKey::new(key::Control_L),
-            dismount: AtomicKey::new(key::Escape),
-            throw: AtomicKey::new(key::Delete),
-            low_throw: AtomicKey::new(key::Insert),
-            talk: AtomicKey::new(key::Return),
+            forward: AtomicKey::new(*keys::constants::Up),
+            back: AtomicKey::new(*keys::constants::Down),
+            left: AtomicKey::new(*keys::constants::Left),
+            right: AtomicKey::new(*keys::constants::Right),
+            jump: AtomicKey::new(*keys::constants::Control_L),
+            dismount: AtomicKey::new(*keys::constants::Escape),
+            throw: AtomicKey::new(*keys::constants::Delete),
+            low_throw: AtomicKey::new(*keys::constants::Insert),
+            talk: AtomicKey::new(*keys::constants::Return),
         }
     }
 }

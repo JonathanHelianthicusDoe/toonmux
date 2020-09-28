@@ -8,6 +8,8 @@ mod ui;
 mod xdo;
 
 use crate::key::{canonicalize_key, key_name};
+use gdk::keys::Key;
+use glib::translate::FromGlib;
 use gtk::{prelude::*, Dialog, DialogFlags, Label, ResponseType};
 use state::{Action, State};
 use std::sync::{atomic::Ordering, Arc};
@@ -58,7 +60,7 @@ fn main() -> Result<(), String> {
                     .map(|i| ctls[i].window.load(Ordering::SeqCst))
                 {
                     if let Err(code) =
-                        state.xdo.send_key_down(window, event_key)
+                        state.xdo.send_key_down(window, &event_key)
                     {
                         eprintln!(
                             "xdo: sending key down failed with code {}.",
@@ -109,7 +111,7 @@ fn main() -> Result<(), String> {
                                     if !talking {
                                         if let Err(code) = state
                                             .xdo
-                                            .send_key_down(window, *key)
+                                            .send_key_down(window, key)
                                         {
                                             eprintln!(
                                                 "xdo: sending key down failed \
@@ -122,7 +124,7 @@ fn main() -> Result<(), String> {
                                 Action::LowThrow(key) => {
                                     if !talking {
                                         if let Err(code) =
-                                            state.xdo.send_key(window, *key)
+                                            state.xdo.send_key(window, key)
                                         {
                                             eprintln!(
                                                 "xdo: sending key failed with \
@@ -147,7 +149,7 @@ fn main() -> Result<(), String> {
                                         if was_talking {
                                             if let Err(code) = state
                                                 .xdo
-                                                .send_key_up(window, *key)
+                                                .send_key_up(window, key)
                                             {
                                                 eprintln!(
                                                     "xdo: sending key up \
@@ -156,9 +158,8 @@ fn main() -> Result<(), String> {
                                                 );
                                             }
                                         } else {
-                                            if let Err(code) = state
-                                                .xdo
-                                                .send_key(window, *key)
+                                            if let Err(code) =
+                                                state.xdo.send_key(window, key)
                                             {
                                                 eprintln!(
                                                     "xdo: sending key failed \
@@ -208,7 +209,8 @@ fn main() -> Result<(), String> {
                     .iter()
                     .map(|i| ctls[i].window.load(Ordering::SeqCst))
                 {
-                    if let Err(code) = state.xdo.send_key_up(window, event_key)
+                    if let Err(code) =
+                        state.xdo.send_key_up(window, &event_key)
                     {
                         eprintln!(
                             "xdo: sending key up failed with code {}.",
@@ -243,7 +245,7 @@ fn main() -> Result<(), String> {
                                 match action {
                                     Action::Simple(key) => {
                                         if let Err(code) =
-                                            state.xdo.send_key_up(window, *key)
+                                            state.xdo.send_key_up(window, key)
                                         {
                                             eprintln!(
                                                 "xdo: sending key up failed \
@@ -406,7 +408,7 @@ fn main() -> Result<(), String> {
             let toonmux_ref = Arc::clone(&toonmux);
             toonmux.interface.main_bindings_row.$key_id.connect_clicked(
                 move |this| {
-                    let key_choose_dialog = Dialog::new_with_buttons(
+                    let key_choose_dialog = Dialog::with_buttons(
                         Some(concat!(
                             "Binding main \u{201c}",
                             $key_name,
@@ -442,7 +444,7 @@ fn main() -> Result<(), String> {
 
                                 // If the user remaps the key to the same key,
                                 // we don't need to do anything.
-                                if old_key == new_key {
+                                if old_key == *new_key {
                                     kcd.response(ResponseType::Cancel);
 
                                     return Inhibit(false);
@@ -450,7 +452,7 @@ fn main() -> Result<(), String> {
 
                                 // Make sure we aren't registering a duplicate
                                 // main binding.
-                                if state.is_bound_main(new_key) {
+                                if state.is_bound_main(&new_key) {
                                     eprintln!(
                                         "Main bindings may not overlap.",
                                     );
@@ -463,11 +465,14 @@ fn main() -> Result<(), String> {
                                 state
                                     .main_bindings
                                     .$key_id
-                                    .store(new_key, Ordering::SeqCst);
+                                    .store(*new_key, Ordering::SeqCst);
 
                                 // Perform rerouting.
                                 if $needs_reroute {
-                                    state.reroute_main(old_key, new_key);
+                                    state.reroute_main(
+                                        &Key::from_glib(old_key),
+                                        &new_key,
+                                    );
                                 }
 
                                 // Relinquish control to main window.
@@ -480,19 +485,27 @@ fn main() -> Result<(), String> {
 
                     key_choose_dialog.show_all();
                     let resp = key_choose_dialog.run();
-                    key_choose_dialog.destroy();
+                    // Unfortunately this method is now considered `unsafe`,
+                    // but that's only because it's considered UB to call any
+                    // methods on the object after destroying it, as you would
+                    // expect.  We _do_want to destroy the dialog here, rather
+                    // than making it unresponsive until the user manually
+                    // presses the 'X' button.
+                    unsafe {
+                        key_choose_dialog.destroy();
+                    }
 
                     match resp {
                         // User pressed a key. State manipulation is already
                         // done by that handler so we just need to update what
                         // is displayed in the UI.
                         ResponseType::Accept => this.set_label(
-                            key_name(
+                            key_name(Key::from_glib(
                                 state
                                     .main_bindings
                                     .$key_id
                                     .load(Ordering::SeqCst),
-                            )
+                            ))
                             .as_str(),
                         ),
                         // User pressed "Clear" button. We have to do state
@@ -509,7 +522,10 @@ fn main() -> Result<(), String> {
 
                             // Perform rerouting.
                             if $needs_reroute {
-                                state.reroute_main(old_key, new_key);
+                                state.reroute_main(
+                                    &Key::from_glib(old_key),
+                                    &Key::from_glib(new_key),
+                                );
                             }
 
                             this.set_label("");
@@ -606,7 +622,7 @@ fn hook_up_controller_ui(
             let state = Arc::clone(state);
             let toonmux = Arc::clone(toonmux);
             ctl_ui.$key_id.connect_clicked(move |this| {
-                let key_choose_dialog = Dialog::new_with_buttons(
+                let key_choose_dialog = Dialog::with_buttons(
                     Some(concat!(
                         "Binding \u{201c}",
                         $key_name,
@@ -640,11 +656,11 @@ fn hook_up_controller_ui(
                                 [ctl_ix]
                                 .bindings
                                 .$key_id
-                                .swap(new_key, Ordering::SeqCst);
+                                .swap(*new_key, Ordering::SeqCst);
 
                             // If the user remaps the key to the same key, we
                             // don't need to do anything.
-                            if old_key == new_key {
+                            if old_key == *new_key {
                                 kcd.response(ResponseType::Cancel);
 
                                 return Inhibit(false);
@@ -658,10 +674,10 @@ fn hook_up_controller_ui(
                             // Perform rerouting.
                             state.reroute(
                                 ctl_ix,
-                                old_key,
-                                new_key,
-                                main_key,
-                                Some(Action::$action_ty(main_key)),
+                                &Key::from_glib(old_key),
+                                &new_key,
+                                &main_key,
+                                Some(Action::$action_ty(main_key.clone())),
                             );
 
                             // Relinquish control to main window.
@@ -674,19 +690,26 @@ fn hook_up_controller_ui(
 
                 key_choose_dialog.show_all();
                 let resp = key_choose_dialog.run();
-                key_choose_dialog.destroy();
+                // Unfortunately this method is now considered `unsafe`, but
+                // that's only because it's considered UB to call any methods
+                // on the object after destroying it, as you would expect.  We
+                // _do_want to destroy the dialog here, rather than making it
+                // unresponsive until the user manually presses the 'X' button.
+                unsafe {
+                    key_choose_dialog.destroy();
+                }
 
                 match resp {
                     // User pressed a key. State manipulation is already done
                     // by that handler so we just need to update what is
                     // displayed in the UI.
                     ResponseType::Accept => this.set_label(
-                        key_name(
+                        key_name(Key::from_glib(
                             state.controllers.read().unwrap()[ctl_ix]
                                 .bindings
                                 .$key_id
                                 .load(Ordering::SeqCst),
-                        )
+                        ))
                         .as_str(),
                     ),
                     // User pressed "Clear" button. We have to do state
@@ -707,8 +730,13 @@ fn hook_up_controller_ui(
                         let main_key = state.main_bindings.$key_id();
 
                         // Perform rerouting.
-                        state
-                            .reroute(ctl_ix, old_key, new_key, main_key, None);
+                        state.reroute(
+                            ctl_ix,
+                            &Key::from_glib(old_key),
+                            &Key::from_glib(new_key),
+                            &main_key,
+                            None,
+                        );
 
                         this.set_label("");
                     }

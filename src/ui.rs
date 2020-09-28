@@ -3,6 +3,8 @@ use crate::{
     key::key_name,
     state::{self, State},
 };
+use gdk::keys::Key;
+use glib::translate::FromGlib;
 use gtk::prelude::*;
 use serde_json;
 use std::{
@@ -148,17 +150,17 @@ impl Header {
         // Enable the window controls within this headerbar.
         container.set_show_close_button(true);
 
-        let expand = gtk::Button::new_with_label("\u{22ee}");
+        let expand = gtk::Button::with_label("\u{22ee}");
         container.pack_start(&expand);
 
-        let mirroring = gtk::Button::new_with_label("\u{22a3}");
+        let mirroring = gtk::Button::with_label("\u{22a3}");
         container.pack_start(&mirroring);
 
-        let add = gtk::Button::new_with_label("+");
+        let add = gtk::Button::with_label("+");
         add.get_style_context().add_class("suggested-action");
         container.pack_start(&add);
 
-        let remove = gtk::Button::new_with_label("-");
+        let remove = gtk::Button::with_label("-");
         remove.get_style_context().add_class("destructive-action");
         container.pack_start(&remove);
 
@@ -360,28 +362,28 @@ impl MainBindingsRow {
         Self {
             window_label: gtk::Label::new(Some("window")),
             mirror_label: gtk::Label::new(Some("mirror")),
-            forward: gtk::Button::new_with_label(
+            forward: gtk::Button::with_label(
                 key_name(state.main_bindings.forward()).as_str(),
             ),
-            back: gtk::Button::new_with_label(
+            back: gtk::Button::with_label(
                 key_name(state.main_bindings.back()).as_str(),
             ),
-            left: gtk::Button::new_with_label(
+            left: gtk::Button::with_label(
                 key_name(state.main_bindings.left()).as_str(),
             ),
-            right: gtk::Button::new_with_label(
+            right: gtk::Button::with_label(
                 key_name(state.main_bindings.right()).as_str(),
             ),
-            jump: gtk::Button::new_with_label(
+            jump: gtk::Button::with_label(
                 key_name(state.main_bindings.jump()).as_str(),
             ),
-            dismount: gtk::Button::new_with_label(
+            dismount: gtk::Button::with_label(
                 key_name(state.main_bindings.dismount()).as_str(),
             ),
-            throw: gtk::Button::new_with_label(
+            throw: gtk::Button::with_label(
                 key_name(state.main_bindings.throw()).as_str(),
             ),
-            toggle_mirroring: gtk::Button::new_with_label(
+            toggle_mirroring: gtk::Button::with_label(
                 key_name(state.main_bindings.toggle_mirroring()).as_str(),
             ),
         }
@@ -394,7 +396,7 @@ impl ControllerUi {
         ctl_ix: usize,
         ctl_count: usize,
     ) -> Self {
-        let pick_window = gtk::Button::new_with_label("+");
+        let pick_window = gtk::Button::with_label("+");
         pick_window
             .get_style_context()
             .add_class("suggested-action");
@@ -406,41 +408,59 @@ impl ControllerUi {
                 ctl_ix,
                 ctl_count,
             ),
-            forward: gtk::Button::new_with_label(
-                key_name(ctl_state.bindings.forward.load(Ordering::SeqCst))
-                    .as_str(),
+            forward: gtk::Button::with_label(
+                key_name(Key::from_glib(
+                    ctl_state.bindings.forward.load(Ordering::SeqCst),
+                ))
+                .as_str(),
             ),
-            back: gtk::Button::new_with_label(
-                key_name(ctl_state.bindings.back.load(Ordering::SeqCst))
-                    .as_str(),
+            back: gtk::Button::with_label(
+                key_name(Key::from_glib(
+                    ctl_state.bindings.back.load(Ordering::SeqCst),
+                ))
+                .as_str(),
             ),
-            left: gtk::Button::new_with_label(
-                key_name(ctl_state.bindings.left.load(Ordering::SeqCst))
-                    .as_str(),
+            left: gtk::Button::with_label(
+                key_name(Key::from_glib(
+                    ctl_state.bindings.left.load(Ordering::SeqCst),
+                ))
+                .as_str(),
             ),
-            right: gtk::Button::new_with_label(
-                key_name(ctl_state.bindings.right.load(Ordering::SeqCst))
-                    .as_str(),
+            right: gtk::Button::with_label(
+                key_name(Key::from_glib(
+                    ctl_state.bindings.right.load(Ordering::SeqCst),
+                ))
+                .as_str(),
             ),
-            jump: gtk::Button::new_with_label(
-                key_name(ctl_state.bindings.jump.load(Ordering::SeqCst))
-                    .as_str(),
+            jump: gtk::Button::with_label(
+                key_name(Key::from_glib(
+                    ctl_state.bindings.jump.load(Ordering::SeqCst),
+                ))
+                .as_str(),
             ),
-            dismount: gtk::Button::new_with_label(
-                key_name(ctl_state.bindings.dismount.load(Ordering::SeqCst))
-                    .as_str(),
+            dismount: gtk::Button::with_label(
+                key_name(Key::from_glib(
+                    ctl_state.bindings.dismount.load(Ordering::SeqCst),
+                ))
+                .as_str(),
             ),
-            throw: gtk::Button::new_with_label(
-                key_name(ctl_state.bindings.throw.load(Ordering::SeqCst))
-                    .as_str(),
+            throw: gtk::Button::with_label(
+                key_name(Key::from_glib(
+                    ctl_state.bindings.throw.load(Ordering::SeqCst),
+                ))
+                .as_str(),
             ),
-            low_throw: gtk::Button::new_with_label(
-                key_name(ctl_state.bindings.low_throw.load(Ordering::SeqCst))
-                    .as_str(),
+            low_throw: gtk::Button::with_label(
+                key_name(Key::from_glib(
+                    ctl_state.bindings.low_throw.load(Ordering::SeqCst),
+                ))
+                .as_str(),
             ),
-            talk: gtk::Button::new_with_label(
-                key_name(ctl_state.bindings.talk.load(Ordering::SeqCst))
-                    .as_str(),
+            talk: gtk::Button::with_label(
+                key_name(Key::from_glib(
+                    ctl_state.bindings.talk.load(Ordering::SeqCst),
+                ))
+                .as_str(),
             ),
         }
     }
@@ -472,13 +492,13 @@ impl Mirror {
         }
 
         let menu = gtk::Menu::new();
-        menu.attach(&gtk::MenuItem::new_with_label("none"), 0, 1, 0, 1);
+        menu.attach(&gtk::MenuItem::with_label("none"), 0, 1, 0, 1);
         for i in 1..(ctl_count + 1) {
             let i_u32 = i as u32;
 
             if i != ctl_ix + 1 {
                 menu.attach(
-                    &gtk::MenuItem::new_with_label(&i.to_string()),
+                    &gtk::MenuItem::with_label(&i.to_string()),
                     0,
                     1,
                     i_u32,
@@ -506,7 +526,7 @@ impl Mirror {
         // FIXME: `.get_children()` allocates.
         let len = self.menu.get_children().len() as u32;
 
-        let new_item = gtk::MenuItem::new_with_label(&len.to_string());
+        let new_item = gtk::MenuItem::with_label(&len.to_string());
         self.menu.attach(&new_item, 0, 1, len, len + 1);
         new_item.show_all();
 

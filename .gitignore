@@ -2,6 +2,7 @@
 /target
 **/*.rs.bk
 Cargo.lock
+build.sh
 
 # text editing stuff
 *.swp

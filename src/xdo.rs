@@ -1,6 +1,6 @@
 //! This module is where all of the gross `unsafe` stuff lives.
 
-use gdk::{self, enums::key::Key};
+use gdk::{self, keys::Key};
 use glib::GString;
 use libxdo_sys;
 use std::{num::NonZeroI32, os::raw::c_char};
@@ -38,13 +38,13 @@ impl Xdo {
     pub fn send_key_down(
         &self,
         window: Window,
-        key: Key,
+        key: &Key,
     ) -> Result<(), NonZeroI32> {
         if window == 0 {
             return Ok(());
         }
 
-        let keyval_name = gdk::keyval_name(key).expect("invalid `Key`");
+        let keyval_name = key.name().expect("invalid `Key`");
         let res = unsafe {
             libxdo_sys::xdo_send_keysequence_window_down(
                 self.handle,
@@ -65,13 +65,13 @@ impl Xdo {
     pub fn send_key_up(
         &self,
         window: Window,
-        key: Key,
+        key: &Key,
     ) -> Result<(), NonZeroI32> {
         if window == 0 {
             return Ok(());
         }
 
-        let keyval_name = gdk::keyval_name(key).expect("invalid `Key`");
+        let keyval_name = key.name().expect("invalid `Key`");
         let res = unsafe {
             libxdo_sys::xdo_send_keysequence_window_up(
                 self.handle,
@@ -92,13 +92,13 @@ impl Xdo {
     pub fn send_key(
         &self,
         window: Window,
-        key: Key,
+        key: &Key,
     ) -> Result<(), NonZeroI32> {
         if window == 0 {
             return Ok(());
         }
 
-        let keyval_name = gdk::keyval_name(key).expect("invalid `Key`");
+        let keyval_name = key.name().expect("invalid `Key`");
         let res = unsafe {
             libxdo_sys::xdo_send_keysequence_window(
                 self.handle,
@@ -125,14 +125,7 @@ impl Drop for Xdo {
 }
 
 /// Return value has the same lifetime as `gstring`.
+#[inline(always)]
 fn gstring_as_ptr(gstring: &GString) -> *const c_char {
-    match gstring {
-        GString::ForeignOwned(maybe_cstring) => maybe_cstring
-            .as_ref()
-            .expect("ForeignOwned shouldn't be empty")
-            .as_c_str()
-            .as_ptr(),
-        &GString::Borrowed(ptr, _) => ptr,
-        &GString::Owned(mut_ptr, _) => mut_ptr as *const c_char,
-    }
+    gstring.as_str().as_ptr() as *const c_char
 }
