@@ -40,6 +40,7 @@ struct LabelRow {
     left_label: gtk::Label,
     right_label: gtk::Label,
     jump_label: gtk::Label,
+    walk_sprint_label: gtk::Label,
     dismount_label: gtk::Label,
     throw_label: gtk::Label,
     low_throw_label: gtk::Label,
@@ -54,6 +55,7 @@ pub struct MainBindingsRow {
     pub left: gtk::Button,
     pub right: gtk::Button,
     pub jump: gtk::Button,
+    pub walk_sprint: gtk::Button,
     pub dismount: gtk::Button,
     pub throw: gtk::Button,
     pub toggle_mirroring: gtk::Button,
@@ -67,6 +69,7 @@ pub struct ControllerUi {
     pub left: gtk::Button,
     pub right: gtk::Button,
     pub jump: gtk::Button,
+    pub walk_sprint: gtk::Button,
     pub dismount: gtk::Button,
     pub throw: gtk::Button,
     pub low_throw: gtk::Button,
@@ -238,13 +241,15 @@ impl Interface {
         self.container
             .attach(&self.label_row.jump_label, 6, 0, 1, 1);
         self.container
-            .attach(&self.label_row.dismount_label, 7, 0, 1, 1);
+            .attach(&self.label_row.walk_sprint_label, 7, 0, 1, 1);
         self.container
-            .attach(&self.label_row.throw_label, 8, 0, 1, 1);
+            .attach(&self.label_row.dismount_label, 8, 0, 1, 1);
         self.container
-            .attach(&self.label_row.low_throw_label, 9, 0, 1, 1);
+            .attach(&self.label_row.throw_label, 9, 0, 1, 1);
         self.container
-            .attach(&self.label_row.talk_label, 10, 0, 1, 1);
+            .attach(&self.label_row.low_throw_label, 10, 0, 1, 1);
+        self.container
+            .attach(&self.label_row.talk_label, 11, 0, 1, 1);
 
         self.container.attach(
             &self.main_bindings_row.window_label,
@@ -271,9 +276,11 @@ impl Interface {
         self.container
             .attach(&self.main_bindings_row.jump, 6, 1, 1, 1);
         self.container
-            .attach(&self.main_bindings_row.dismount, 7, 1, 1, 1);
+            .attach(&self.main_bindings_row.walk_sprint, 7, 1, 1, 1);
         self.container
-            .attach(&self.main_bindings_row.throw, 8, 1, 1, 1);
+            .attach(&self.main_bindings_row.dismount, 8, 1, 1, 1);
+        self.container
+            .attach(&self.main_bindings_row.throw, 9, 1, 1, 1);
 
         for (i, ctl_ui) in self
             .controller_uis
@@ -290,10 +297,11 @@ impl Interface {
             self.container.attach(&ctl_ui.left, 4, 2 + i, 1, 1);
             self.container.attach(&ctl_ui.right, 5, 2 + i, 1, 1);
             self.container.attach(&ctl_ui.jump, 6, 2 + i, 1, 1);
-            self.container.attach(&ctl_ui.dismount, 7, 2 + i, 1, 1);
-            self.container.attach(&ctl_ui.throw, 8, 2 + i, 1, 1);
-            self.container.attach(&ctl_ui.low_throw, 9, 2 + i, 1, 1);
-            self.container.attach(&ctl_ui.talk, 10, 2 + i, 1, 1);
+            self.container.attach(&ctl_ui.walk_sprint, 7, 2 + i, 1, 1);
+            self.container.attach(&ctl_ui.dismount, 8, 2 + i, 1, 1);
+            self.container.attach(&ctl_ui.throw, 9, 2 + i, 1, 1);
+            self.container.attach(&ctl_ui.low_throw, 10, 2 + i, 1, 1);
+            self.container.attach(&ctl_ui.talk, 11, 2 + i, 1, 1);
         }
     }
 
@@ -315,11 +323,13 @@ impl Interface {
         self.container.attach(&ctl_ui.left, 4, 2 + ctl_ix, 1, 1);
         self.container.attach(&ctl_ui.right, 5, 2 + ctl_ix, 1, 1);
         self.container.attach(&ctl_ui.jump, 6, 2 + ctl_ix, 1, 1);
-        self.container.attach(&ctl_ui.dismount, 7, 2 + ctl_ix, 1, 1);
-        self.container.attach(&ctl_ui.throw, 8, 2 + ctl_ix, 1, 1);
         self.container
-            .attach(&ctl_ui.low_throw, 9, 2 + ctl_ix, 1, 1);
-        self.container.attach(&ctl_ui.talk, 10, 2 + ctl_ix, 1, 1);
+            .attach(&ctl_ui.walk_sprint, 7, 2 + ctl_ix, 1, 1);
+        self.container.attach(&ctl_ui.dismount, 8, 2 + ctl_ix, 1, 1);
+        self.container.attach(&ctl_ui.throw, 9, 2 + ctl_ix, 1, 1);
+        self.container
+            .attach(&ctl_ui.low_throw, 10, 2 + ctl_ix, 1, 1);
+        self.container.attach(&ctl_ui.talk, 11, 2 + ctl_ix, 1, 1);
 
         self.controller_uis.write().unwrap().push(ctl_ui);
 
@@ -349,6 +359,7 @@ impl LabelRow {
             left_label: gtk::Label::new(Some("left")),
             right_label: gtk::Label::new(Some("right")),
             jump_label: gtk::Label::new(Some("jump")),
+            walk_sprint_label: gtk::Label::new(Some("walk/sprint")),
             dismount_label: gtk::Label::new(Some("dismount")),
             throw_label: gtk::Label::new(Some("throw")),
             low_throw_label: gtk::Label::new(Some("low throw")),
@@ -376,6 +387,9 @@ impl MainBindingsRow {
             ),
             jump: gtk::Button::with_label(
                 key_name(state.main_bindings.jump()).as_str(),
+            ),
+            walk_sprint: gtk::Button::with_label(
+                key_name(state.main_bindings.walk_sprint()).as_str(),
             ),
             dismount: gtk::Button::with_label(
                 key_name(state.main_bindings.dismount()).as_str(),
@@ -438,6 +452,12 @@ impl ControllerUi {
                 ))
                 .as_str(),
             ),
+            walk_sprint: gtk::Button::with_label(
+                key_name(Key::from_glib(
+                    ctl_state.bindings.walk_sprint.load(Ordering::SeqCst),
+                ))
+                .as_str(),
+            ),
             dismount: gtk::Button::with_label(
                 key_name(Key::from_glib(
                     ctl_state.bindings.dismount.load(Ordering::SeqCst),
@@ -474,6 +494,7 @@ impl ControllerUi {
         container.remove(&self.left);
         container.remove(&self.right);
         container.remove(&self.jump);
+        container.remove(&self.walk_sprint);
         container.remove(&self.dismount);
         container.remove(&self.throw);
         container.remove(&self.low_throw);
