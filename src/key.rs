@@ -74,11 +74,12 @@ pub fn key_name(key: Key) -> KeyName {
     }
 }
 
-/// Gets the "canonical" version of a `Key`; the only purpose is to consider
-/// keys like Ctrl that have a "left" and a "right" version to be the same, by
-/// making both of them into the "left" version.
+/// Gets the "canonical" version of a `Key`. This currently does two things:
 ///
-/// Something something, two left feet.
+/// - Fold keys like <kbd>Ctrl</kbd> that have a "left" and a "right" version
+///   into the "left" version.
+/// - Fold keys that have an associated lettercase (e.g. <kbd>g</kbd> ≠
+///   <kbd>G</kbd>) into the "lowercase" version.
 #[inline]
 pub fn canonicalize_key(key: Key) -> Key {
     match key {
@@ -87,6 +88,6 @@ pub fn canonicalize_key(key: Key) -> Key {
         keys::constants::Hyper_R => keys::constants::Hyper_L,
         keys::constants::Shift_R => keys::constants::Shift_L,
         keys::constants::Super_R => keys::constants::Super_L,
-        _ => key,
+        _ => key.to_lower(),
     }
 }
