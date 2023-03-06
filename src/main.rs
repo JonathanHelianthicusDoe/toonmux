@@ -8,8 +8,6 @@ mod ui;
 mod xdo;
 
 use crate::key::{canonicalize_key, key_name};
-use gdk::keys::Key;
-use glib::translate::FromGlib;
 use gtk::{prelude::*, Dialog, DialogFlags, Label, ResponseType};
 use state::{Action, State};
 use std::sync::{atomic::Ordering, Arc};
@@ -45,7 +43,7 @@ fn main() -> Result<(), String> {
         let state = Arc::clone(&state);
         let toonmux_ref = Arc::clone(&toonmux);
         toonmux.main_window.connect_key_press_event(move |_, e| {
-            let event_key = canonicalize_key(e.get_keyval());
+            let event_key = canonicalize_key(e.keyval());
 
             // Handle controllers that are in the "talking" state.
             let talking = !state.talking.is_empty();
@@ -195,7 +193,7 @@ fn main() -> Result<(), String> {
     {
         let state = Arc::clone(&state);
         toonmux.main_window.connect_key_release_event(move |_, e| {
-            let event_key = canonicalize_key(e.get_keyval());
+            let event_key = canonicalize_key(e.keyval());
 
             if !state.talking.is_empty() {
                 // Handle controllers that are in the "talking" state.
@@ -421,7 +419,7 @@ fn main() -> Result<(), String> {
                             ("Cancel", ResponseType::Cancel),
                         ],
                     );
-                    key_choose_dialog.get_content_area().pack_start(
+                    key_choose_dialog.content_area().pack_start(
                         &Label::new(Some(concat!(
                             "Press a key to be bound to \u{201c}",
                             $key_name,
@@ -440,7 +438,7 @@ fn main() -> Result<(), String> {
                                     .main_bindings
                                     .$key_id
                                     .load(Ordering::SeqCst);
-                                let new_key = canonicalize_key(e.get_keyval());
+                                let new_key = canonicalize_key(e.keyval());
 
                                 // If the user remaps the key to the same key,
                                 // we don't need to do anything.
@@ -470,7 +468,7 @@ fn main() -> Result<(), String> {
                                 // Perform rerouting.
                                 if $needs_reroute {
                                     state.reroute_main(
-                                        &Key::from_glib(old_key),
+                                        &old_key.into(),
                                         &new_key,
                                     );
                                 }
@@ -500,12 +498,13 @@ fn main() -> Result<(), String> {
                         // done by that handler so we just need to update what
                         // is displayed in the UI.
                         ResponseType::Accept => this.set_label(
-                            key_name(Key::from_glib(
+                            key_name(
                                 state
                                     .main_bindings
                                     .$key_id
-                                    .load(Ordering::SeqCst),
-                            ))
+                                    .load(Ordering::SeqCst)
+                                    .into(),
+                            )
                             .as_str(),
                         ),
                         // User pressed "Clear" button. We have to do state
@@ -523,8 +522,8 @@ fn main() -> Result<(), String> {
                             // Perform rerouting.
                             if $needs_reroute {
                                 state.reroute_main(
-                                    &Key::from_glib(old_key),
-                                    &Key::from_glib(new_key),
+                                    &old_key.into(),
+                                    &new_key.into(),
                                 );
                             }
 
@@ -597,12 +596,12 @@ fn hook_up_controller_ui(
                 if new_window != old_window {
                     if old_window == 0 {
                         pw.set_label("\u{2213}"); // 00b1
-                        let pw_style_ctx = pw.get_style_context();
+                        let pw_style_ctx = pw.style_context();
                         pw_style_ctx.remove_class("suggested-action");
                         pw_style_ctx.add_class("destructive-action");
                     } else if new_window == 0 {
                         pw.set_label("+");
-                        let pw_style_ctx = pw.get_style_context();
+                        let pw_style_ctx = pw.style_context();
                         pw_style_ctx.remove_class("destructive-action");
                         pw_style_ctx.add_class("suggested-action");
                     }
@@ -635,7 +634,7 @@ fn hook_up_controller_ui(
                         ("Cancel", ResponseType::Cancel),
                     ],
                 );
-                key_choose_dialog.get_content_area().pack_start(
+                key_choose_dialog.content_area().pack_start(
                     &Label::new(Some(concat!(
                         "Press a key to be bound to \u{201c}",
                         $key_name,
@@ -650,7 +649,7 @@ fn hook_up_controller_ui(
                     let state = Arc::clone(&state);
                     key_choose_dialog.connect_key_press_event(
                         move |kcd, e| {
-                            let new_key = canonicalize_key(e.get_keyval());
+                            let new_key = canonicalize_key(e.keyval());
                             // Store the new binding.
                             let old_key = state.controllers.read().unwrap()
                                 [ctl_ix]
@@ -674,7 +673,7 @@ fn hook_up_controller_ui(
                             // Perform rerouting.
                             state.reroute(
                                 ctl_ix,
-                                &Key::from_glib(old_key),
+                                &old_key.into(),
                                 &new_key,
                                 &main_key,
                                 Some(Action::$action_ty(main_key.clone())),
@@ -704,12 +703,13 @@ fn hook_up_controller_ui(
                     // by that handler so we just need to update what is
                     // displayed in the UI.
                     ResponseType::Accept => this.set_label(
-                        key_name(Key::from_glib(
+                        key_name(
                             state.controllers.read().unwrap()[ctl_ix]
                                 .bindings
                                 .$key_id
-                                .load(Ordering::SeqCst),
-                        ))
+                                .load(Ordering::SeqCst)
+                                .into(),
+                        )
                         .as_str(),
                     ),
                     // User pressed "Clear" button. We have to do state
@@ -732,8 +732,8 @@ fn hook_up_controller_ui(
                         // Perform rerouting.
                         state.reroute(
                             ctl_ix,
-                            &Key::from_glib(old_key),
-                            &Key::from_glib(new_key),
+                            &old_key.into(),
+                            &new_key.into(),
                             &main_key,
                             None,
                         );
@@ -768,7 +768,7 @@ fn hook_up_mirror_menu(
     for (i, mirror_menu_item) in ctl_ui
         .mirror
         .menu
-        .get_children()
+        .children()
         .into_iter()
         .map(|c| c.downcast::<gtk::MenuItem>().unwrap())
         .enumerate()

@@ -1,6 +1,5 @@
 use crate::{json, ui, xdo::Xdo};
 use gdk::keys::{self, Key};
-use glib::translate::FromGlib;
 use gtk::prelude::*;
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
@@ -225,14 +224,14 @@ impl State {
                 ( $action_id:ident, $action_ty:ident ) => {
                     let key = ctl.bindings.$action_id.load(Ordering::SeqCst);
                     if key != 0 {
-                        r_lk.entry(Key::from_glib(key))
-                            .or_insert_with(Vec::new)
-                            .push((
+                        r_lk.entry(key.into()).or_insert_with(Vec::new).push(
+                            (
                                 ctl_ix,
                                 Action::$action_ty(
                                     self.main_bindings.$action_id(),
                                 ),
-                            ));
+                            ),
+                        );
                     }
                 };
             }
@@ -398,47 +397,47 @@ impl Controller {
 impl MainBindings {
     #[inline(always)]
     pub fn forward(&self) -> Key {
-        Key::from_glib(self.forward.load(Ordering::SeqCst))
+        self.forward.load(Ordering::SeqCst).into()
     }
 
     #[inline(always)]
     pub fn back(&self) -> Key {
-        Key::from_glib(self.back.load(Ordering::SeqCst))
+        self.back.load(Ordering::SeqCst).into()
     }
 
     #[inline(always)]
     pub fn left(&self) -> Key {
-        Key::from_glib(self.left.load(Ordering::SeqCst))
+        self.left.load(Ordering::SeqCst).into()
     }
 
     #[inline(always)]
     pub fn right(&self) -> Key {
-        Key::from_glib(self.right.load(Ordering::SeqCst))
+        self.right.load(Ordering::SeqCst).into()
     }
 
     #[inline(always)]
     pub fn jump(&self) -> Key {
-        Key::from_glib(self.jump.load(Ordering::SeqCst))
+        self.jump.load(Ordering::SeqCst).into()
     }
 
     #[inline(always)]
     pub fn dismount(&self) -> Key {
-        Key::from_glib(self.dismount.load(Ordering::SeqCst))
+        self.dismount.load(Ordering::SeqCst).into()
     }
 
     #[inline(always)]
     pub fn throw(&self) -> Key {
-        Key::from_glib(self.throw.load(Ordering::SeqCst))
+        self.throw.load(Ordering::SeqCst).into()
     }
 
     #[inline(always)]
     pub fn talk(&self) -> Key {
-        Key::from_glib(self.talk.load(Ordering::SeqCst))
+        self.talk.load(Ordering::SeqCst).into()
     }
 
     #[inline(always)]
     pub fn toggle_mirroring(&self) -> Key {
-        Key::from_glib(self.toggle_mirroring.load(Ordering::SeqCst))
+        self.toggle_mirroring.load(Ordering::SeqCst).into()
     }
 
     /// One of these things is not like the others...

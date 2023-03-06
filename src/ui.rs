@@ -3,8 +3,6 @@ use crate::{
     key::key_name,
     state::{self, State},
 };
-use gdk::keys::Key;
-use glib::translate::FromGlib;
 use gtk::prelude::*;
 use serde_json;
 use std::{
@@ -157,11 +155,11 @@ impl Header {
         container.pack_start(&mirroring);
 
         let add = gtk::Button::with_label("+");
-        add.get_style_context().add_class("suggested-action");
+        add.style_context().add_class("suggested-action");
         container.pack_start(&add);
 
         let remove = gtk::Button::with_label("-");
-        remove.get_style_context().add_class("destructive-action");
+        remove.style_context().add_class("destructive-action");
         container.pack_start(&remove);
 
         Self {
@@ -397,9 +395,7 @@ impl ControllerUi {
         ctl_count: usize,
     ) -> Self {
         let pick_window = gtk::Button::with_label("+");
-        pick_window
-            .get_style_context()
-            .add_class("suggested-action");
+        pick_window.style_context().add_class("suggested-action");
 
         Self {
             pick_window,
@@ -409,57 +405,57 @@ impl ControllerUi {
                 ctl_count,
             ),
             forward: gtk::Button::with_label(
-                key_name(Key::from_glib(
-                    ctl_state.bindings.forward.load(Ordering::SeqCst),
-                ))
+                key_name(
+                    ctl_state.bindings.forward.load(Ordering::SeqCst).into(),
+                )
                 .as_str(),
             ),
             back: gtk::Button::with_label(
-                key_name(Key::from_glib(
-                    ctl_state.bindings.back.load(Ordering::SeqCst),
-                ))
+                key_name(
+                    ctl_state.bindings.back.load(Ordering::SeqCst).into(),
+                )
                 .as_str(),
             ),
             left: gtk::Button::with_label(
-                key_name(Key::from_glib(
-                    ctl_state.bindings.left.load(Ordering::SeqCst),
-                ))
+                key_name(
+                    ctl_state.bindings.left.load(Ordering::SeqCst).into(),
+                )
                 .as_str(),
             ),
             right: gtk::Button::with_label(
-                key_name(Key::from_glib(
-                    ctl_state.bindings.right.load(Ordering::SeqCst),
-                ))
+                key_name(
+                    ctl_state.bindings.right.load(Ordering::SeqCst).into(),
+                )
                 .as_str(),
             ),
             jump: gtk::Button::with_label(
-                key_name(Key::from_glib(
-                    ctl_state.bindings.jump.load(Ordering::SeqCst),
-                ))
+                key_name(
+                    ctl_state.bindings.jump.load(Ordering::SeqCst).into(),
+                )
                 .as_str(),
             ),
             dismount: gtk::Button::with_label(
-                key_name(Key::from_glib(
-                    ctl_state.bindings.dismount.load(Ordering::SeqCst),
-                ))
+                key_name(
+                    ctl_state.bindings.dismount.load(Ordering::SeqCst).into(),
+                )
                 .as_str(),
             ),
             throw: gtk::Button::with_label(
-                key_name(Key::from_glib(
-                    ctl_state.bindings.throw.load(Ordering::SeqCst),
-                ))
+                key_name(
+                    ctl_state.bindings.throw.load(Ordering::SeqCst).into(),
+                )
                 .as_str(),
             ),
             low_throw: gtk::Button::with_label(
-                key_name(Key::from_glib(
-                    ctl_state.bindings.low_throw.load(Ordering::SeqCst),
-                ))
+                key_name(
+                    ctl_state.bindings.low_throw.load(Ordering::SeqCst).into(),
+                )
                 .as_str(),
             ),
             talk: gtk::Button::with_label(
-                key_name(Key::from_glib(
-                    ctl_state.bindings.talk.load(Ordering::SeqCst),
-                ))
+                key_name(
+                    ctl_state.bindings.talk.load(Ordering::SeqCst).into(),
+                )
                 .as_str(),
             ),
         }
@@ -484,7 +480,7 @@ impl ControllerUi {
 impl Mirror {
     fn new(val: usize, ctl_ix: usize, ctl_count: usize) -> Self {
         let button = gtk::MenuButton::new();
-        button.get_child().map(|c| button.remove(&c));
+        button.child().map(|c| button.remove(&c));
         if val == ::std::usize::MAX {
             button.add(&gtk::Label::new(Some("\u{22a3}")));
         } else {
@@ -524,7 +520,7 @@ impl Mirror {
     #[inline]
     pub fn add_menu_item(&self) -> gtk::MenuItem {
         // FIXME: `.get_children()` allocates.
-        let len = self.menu.get_children().len() as u32;
+        let len = self.menu.children().len() as u32;
 
         let new_item = gtk::MenuItem::with_label(&len.to_string());
         self.menu.attach(&new_item, 0, 1, len, len + 1);
@@ -535,7 +531,7 @@ impl Mirror {
 
     #[inline]
     pub fn remove_menu_item(&self) {
-        if let Some(menu_item) = self.menu.get_children().last() {
+        if let Some(menu_item) = self.menu.children().last() {
             self.menu.remove(menu_item);
         }
     }
