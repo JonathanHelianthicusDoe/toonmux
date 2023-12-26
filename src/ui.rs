@@ -3,6 +3,7 @@ use crate::{
     key::key_name,
     state::{self, State},
 };
+use glib::Propagation;
 use gtk::prelude::*;
 use serde_json;
 use std::{
@@ -129,7 +130,7 @@ impl Toonmux {
             // Actually quit.
             gtk::main_quit();
 
-            gtk::Inhibit(false)
+            Propagation::Proceed
         });
 
         Self {

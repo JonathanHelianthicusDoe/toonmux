@@ -8,6 +8,7 @@ mod ui;
 mod xdo;
 
 use crate::key::{canonicalize_key, key_name};
+use glib::Propagation;
 use gtk::{prelude::*, Dialog, DialogFlags, Label, ResponseType};
 use state::{Action, State};
 use std::sync::{atomic::Ordering, Arc};
@@ -185,7 +186,7 @@ fn main() -> Result<(), String> {
                 // reader-writer lock.
             }
 
-            Inhibit(true)
+            Propagation::Stop
 
             // Relinquishing read lock on the routing state reader-writer lock.
         });
@@ -275,7 +276,7 @@ fn main() -> Result<(), String> {
                 // lock.
             }
 
-            Inhibit(true)
+            Propagation::Stop
         });
     }
 
@@ -445,7 +446,7 @@ fn main() -> Result<(), String> {
                                 if old_key == *new_key {
                                     kcd.response(ResponseType::Cancel);
 
-                                    return Inhibit(false);
+                                    return Propagation::Proceed;
                                 }
 
                                 // Make sure we aren't registering a duplicate
@@ -456,7 +457,7 @@ fn main() -> Result<(), String> {
                                     );
                                     kcd.response(ResponseType::Cancel);
 
-                                    return Inhibit(false);
+                                    return Propagation::Proceed;
                                 }
 
                                 // Store the new binding.
@@ -476,7 +477,7 @@ fn main() -> Result<(), String> {
                                 // Relinquish control to main window.
                                 kcd.response(ResponseType::Accept);
 
-                                Inhibit(false)
+                                Propagation::Proceed
                             },
                         );
                     }
@@ -486,7 +487,7 @@ fn main() -> Result<(), String> {
                     // Unfortunately this method is now considered `unsafe`,
                     // but that's only because it's considered UB to call any
                     // methods on the object after destroying it, as you would
-                    // expect.  We _do_want to destroy the dialog here, rather
+                    // expect.  We _do_ want to destroy the dialog here, rather
                     // than making it unresponsive until the user manually
                     // presses the 'X' button.
                     unsafe {
@@ -662,7 +663,7 @@ fn hook_up_controller_ui(
                             if old_key == *new_key {
                                 kcd.response(ResponseType::Cancel);
 
-                                return Inhibit(false);
+                                return Propagation::Proceed;
                             }
 
                             // Get the main key binding that this key maps to
@@ -682,7 +683,7 @@ fn hook_up_controller_ui(
                             // Relinquish control to main window.
                             kcd.response(ResponseType::Accept);
 
-                            Inhibit(false)
+                            Propagation::Proceed
                         },
                     );
                 }
