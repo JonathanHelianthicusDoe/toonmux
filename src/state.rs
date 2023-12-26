@@ -55,6 +55,7 @@ pub struct MainBindings {
     pub left: AtomicKey,
     pub right: AtomicKey,
     pub jump: AtomicKey,
+    pub walk_sprint: AtomicKey,
     pub dismount: AtomicKey,
     pub throw: AtomicKey,
     pub talk: AtomicKey,
@@ -68,6 +69,7 @@ pub struct Bindings {
     pub left: AtomicKey,
     pub right: AtomicKey,
     pub jump: AtomicKey,
+    pub walk_sprint: AtomicKey,
     pub dismount: AtomicKey,
     pub throw: AtomicKey,
     pub low_throw: AtomicKey,
@@ -241,6 +243,7 @@ impl State {
             route_action!(left, Simple);
             route_action!(right, Simple);
             route_action!(jump, Simple);
+            route_action!(walk_sprint, Simple);
             route_action!(dismount, Simple);
             route_action!(throw, Simple);
             route_action!(low_throw, LowThrow);
@@ -254,6 +257,7 @@ impl State {
             || self.main_bindings.left.load(Ordering::SeqCst) == **key
             || self.main_bindings.right.load(Ordering::SeqCst) == **key
             || self.main_bindings.jump.load(Ordering::SeqCst) == **key
+            || self.main_bindings.walk_sprint.load(Ordering::SeqCst) == **key
             || self.main_bindings.dismount.load(Ordering::SeqCst) == **key
             || self.main_bindings.throw.load(Ordering::SeqCst) == **key
             || self.main_bindings.talk.load(Ordering::SeqCst) == **key
@@ -421,6 +425,11 @@ impl MainBindings {
     }
 
     #[inline(always)]
+    pub fn walk_sprint(&self) -> Key {
+        Key::from_glib(self.walk_sprint.load(Ordering::SeqCst))
+    }
+
+    #[inline(always)]
     pub fn dismount(&self) -> Key {
         self.dismount.load(Ordering::SeqCst).into()
     }
@@ -456,6 +465,9 @@ impl Clone for MainBindings {
             left: AtomicKey::new(self.left.load(Ordering::SeqCst)),
             right: AtomicKey::new(self.right.load(Ordering::SeqCst)),
             jump: AtomicKey::new(self.jump.load(Ordering::SeqCst)),
+            walk_sprint: AtomicKey::new(
+                self.walk_sprint.load(Ordering::SeqCst),
+            ),
             dismount: AtomicKey::new(self.dismount.load(Ordering::SeqCst)),
             throw: AtomicKey::new(self.throw.load(Ordering::SeqCst)),
             talk: AtomicKey::new(self.talk.load(Ordering::SeqCst)),
@@ -475,10 +487,11 @@ impl Default for MainBindings {
             left: AtomicKey::new(*keys::constants::Left),
             right: AtomicKey::new(*keys::constants::Right),
             jump: AtomicKey::new(*keys::constants::Control_L),
+            walk_sprint: AtomicKey::new(*keys::constants::Shift_L),
             dismount: AtomicKey::new(*keys::constants::Escape),
             throw: AtomicKey::new(*keys::constants::Delete),
             talk: AtomicKey::new(*keys::constants::Return),
-            toggle_mirroring: AtomicKey::new(*keys::constants::Shift_L),
+            toggle_mirroring: AtomicKey::new(*keys::constants::Alt_L),
         }
     }
 }
@@ -492,6 +505,9 @@ impl Clone for Bindings {
             left: AtomicKey::new(self.left.load(Ordering::SeqCst)),
             right: AtomicKey::new(self.right.load(Ordering::SeqCst)),
             jump: AtomicKey::new(self.jump.load(Ordering::SeqCst)),
+            walk_sprint: AtomicKey::new(
+                self.walk_sprint.load(Ordering::SeqCst),
+            ),
             dismount: AtomicKey::new(self.dismount.load(Ordering::SeqCst)),
             throw: AtomicKey::new(self.throw.load(Ordering::SeqCst)),
             low_throw: AtomicKey::new(self.low_throw.load(Ordering::SeqCst)),
@@ -509,6 +525,7 @@ impl Default for Bindings {
             left: AtomicKey::new(*keys::constants::Left),
             right: AtomicKey::new(*keys::constants::Right),
             jump: AtomicKey::new(*keys::constants::Control_L),
+            walk_sprint: AtomicKey::new(*keys::constants::Shift_L),
             dismount: AtomicKey::new(*keys::constants::Escape),
             throw: AtomicKey::new(*keys::constants::Delete),
             low_throw: AtomicKey::new(*keys::constants::Insert),

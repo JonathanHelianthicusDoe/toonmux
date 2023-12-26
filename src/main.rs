@@ -543,6 +543,7 @@ fn main() -> Result<(), String> {
     connect_main_key_binder!(left, "left", true);
     connect_main_key_binder!(right, "right", true);
     connect_main_key_binder!(jump, "jump", true);
+    connect_main_key_binder!(walk_sprint, "walk/sprint", true);
     connect_main_key_binder!(dismount, "dismount", true);
     connect_main_key_binder!(throw, "throw", true);
     connect_main_key_binder!(toggle_mirroring, "toggle mirroring", false);
@@ -754,6 +755,7 @@ fn hook_up_controller_ui(
     connect_key_binder!(left, "left", Simple);
     connect_key_binder!(right, "right", Simple);
     connect_key_binder!(jump, "jump", Simple);
+    connect_key_binder!(walk_sprint, "walk/sprint", Simple);
     connect_key_binder!(dismount, "dismount", Simple);
     connect_key_binder!(throw, "throw", Simple);
     connect_key_binder!(low_throw, "low throw", LowThrow);
