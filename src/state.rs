@@ -426,7 +426,7 @@ impl MainBindings {
 
     #[inline(always)]
     pub fn walk_sprint(&self) -> Key {
-        Key::from_glib(self.walk_sprint.load(Ordering::SeqCst))
+        self.walk_sprint.load(Ordering::SeqCst).into()
     }
 
     #[inline(always)]

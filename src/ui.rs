@@ -450,9 +450,13 @@ impl ControllerUi {
                 .as_str(),
             ),
             walk_sprint: gtk::Button::with_label(
-                key_name(Key::from_glib(
-                    ctl_state.bindings.walk_sprint.load(Ordering::SeqCst),
-                ))
+                key_name(
+                    ctl_state
+                        .bindings
+                        .walk_sprint
+                        .load(Ordering::SeqCst)
+                        .into(),
+                )
                 .as_str(),
             ),
             dismount: gtk::Button::with_label(
