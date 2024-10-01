@@ -12,10 +12,10 @@ license = "GPL-3.0-or-later"
 
 [dependencies]
 gdk = "0.18.0"
-glib = "0.18.4"
+glib = "0.18.5"
 gtk = "0.18.1"
 libxdo-sys = "0.11.0"
-rustc-hash = "1.1.0"
+rustc-hash = "2.0.0"
 serde = { version = "1.0.193", features = ["derive"] }
 serde_json = "1.0.108"
 x11 = "2.21.0"
